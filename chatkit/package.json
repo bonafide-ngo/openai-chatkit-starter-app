@@ -2,8 +2,10 @@
   "name": "chatkit",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --names backend,frontend \"npm run backend\" \"npm run frontend\"",
-    "frontend": "npm --prefix frontend install && npm --prefix frontend run dev",
+    "dev": "concurrently --kill-others-on-fail --names backend,frontend \"npm run backend\" \"npm run frontend-dev\"",
+    "frontend-dev": "npm --prefix frontend install && npm --prefix frontend run dev",
+    "build": "concurrently --kill-others-on-fail --names backend,frontend \"npm run backend\" \"npm run frontend-build\"",
+    "frontend-build": "npm --prefix frontend install && npm --prefix frontend run build",
     "backend": "./backend/scripts/run.sh"
   },
   "devDependencies": {

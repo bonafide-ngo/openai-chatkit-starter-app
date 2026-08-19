@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from .server import StarterChatServer
 
+
 app = FastAPI(title="ChatKit Starter API")
 
 app.add_middleware(
@@ -30,6 +31,27 @@ async def chatkit_endpoint(request: Request) -> Response:
 
     if isinstance(result, StreamingResult):
         return StreamingResponse(result, media_type="text/event-stream")
+
     if hasattr(result, "json"):
         return Response(content=result.json, media_type="application/json")
+
     return JSONResponse(result)
+
+from pathlib import Path
+
+UPLOAD_DIR = Path("/tmp/chatkit-uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.put("/chatkit/uploads/{attachment_id}")
+async def upload_attachment(
+    attachment_id: str,
+    request: Request,
+) -> Response:
+    path = UPLOAD_DIR / attachment_id
+
+    with path.open("wb") as output:
+        async for chunk in request.stream():
+            output.write(chunk)
+
+    return Response(status_code=204)

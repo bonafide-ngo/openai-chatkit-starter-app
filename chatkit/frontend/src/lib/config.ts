@@ -3,8 +3,8 @@ const readEnvString = (value: unknown): string | undefined =>
     ? value.trim()
     : undefined;
 
-export const CHATKIT_API_URL =
-  readEnvString(import.meta.env.VITE_CHATKIT_API_URL) ?? "/chatkit";
+export const CHATKIT_API_URL = "http://localhost:8000/chatkit";
+//  readEnvString(import.meta.env.VITE_CHATKIT_API_URL) ?? "/chatkit";
 
 /**
  * ChatKit requires a domain key at runtime. Use the local fallback while

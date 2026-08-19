@@ -10,11 +10,11 @@ from collections import defaultdict
 from chatkit.store import NotFoundError, Store
 from chatkit.types import Attachment, Page, ThreadItem, ThreadMetadata
 
-
 class MemoryStore(Store[dict]):
     def __init__(self):
         self.threads: dict[str, ThreadMetadata] = {}
         self.items: dict[str, list[ThreadItem]] = defaultdict(list)
+        self.attachments: dict[str, Attachment] = {}
 
     async def load_thread(self, thread_id: str, context: dict) -> ThreadMetadata:
         if thread_id not in self.threads:
@@ -55,6 +55,32 @@ class MemoryStore(Store[dict]):
     ) -> None:
         self.items[thread_id].append(item)
 
+    async def save_attachment(
+        self,
+        attachment: Attachment,
+        context: dict,
+    ) -> None:
+        self.attachments[attachment.id] = attachment
+
+    async def load_attachment(
+        self,
+        attachment_id: str,
+        context: dict,
+    ) -> Attachment:
+        if attachment_id not in self.attachments:
+            raise NotFoundError(
+                f"Attachment {attachment_id} not found"
+            )
+
+        return self.attachments[attachment_id]
+
+    async def delete_attachment(
+        self,
+        attachment_id: str,
+        context: dict,
+    ) -> None:
+        self.attachments.pop(attachment_id, None)
+
     async def save_item(self, thread_id: str, item: ThreadItem, context: dict) -> None:
         items = self.items[thread_id]
         for idx, existing in enumerate(items):
@@ -74,6 +100,15 @@ class MemoryStore(Store[dict]):
     async def delete_thread(self, thread_id: str, context: dict) -> None:
         self.threads.pop(thread_id, None)
         self.items.pop(thread_id, None)
+
+        attachment_ids = [
+            attachment_id
+            for attachment_id, attachment in self.attachments.items()
+            if attachment.thread_id == thread_id
+        ]
+
+        for attachment_id in attachment_ids:
+            self.attachments.pop(attachment_id, None)
 
     async def delete_thread_item(
         self, thread_id: str, item_id: str, context: dict
@@ -102,14 +137,3 @@ class MemoryStore(Store[dict]):
         has_more = start + limit < len(sorted_rows)
         next_after = cursor_key(data[-1]) if has_more and data else None
         return Page(data=data, has_more=has_more, after=next_after)
-
-    # Attachments are not implemented in the quickstart store
-
-    async def save_attachment(self, attachment: Attachment, context: dict) -> None:
-        raise NotImplementedError()
-
-    async def load_attachment(self, attachment_id: str, context: dict) -> Attachment:
-        raise NotImplementedError()
-
-    async def delete_attachment(self, attachment_id: str, context: dict) -> None:
-        raise NotImplementedError()
