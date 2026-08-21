@@ -29,7 +29,7 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
 | `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
 | `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_localhost_dev` | ChatKit domain key. |
-| `CHATKIT_STORE_PATH` | `backend/.data/chatkit-store.json` | File-store location. |
+| `CHATKIT_STORE_PATH` | `.data/chatkit-store.json` | File-store location relative to `backend/`. |
 | `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
 | `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
 | `CHATKIT_PUBLIC_BASE_URL` | none | Public HTTPS URL for previews and downloads. |
