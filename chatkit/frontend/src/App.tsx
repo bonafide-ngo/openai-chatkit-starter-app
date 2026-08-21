@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { ChatKitPanel } from "./components/ChatKitPanel";
-import { CHATKIT_DELETE_ALL_URL } from "./lib/config";
+import {
+  CHATKIT_DELETE_ALL_URL,
+  UI_LABELS,
+} from "./lib/config";
 
 type Theme = "light" | "dark";
+type ChatMode = "persistent" | "temporary";
 
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -16,6 +20,10 @@ export default function App() {
       ? "dark"
       : "light";
   });
+  const [chatMode, setChatMode] = useState<ChatMode>("persistent");
+  const [persistentThreadId, setPersistentThreadId] = useState<string | null>(
+    () => localStorage.getItem("chatkit-persistent-thread"),
+  );
 
   useEffect(() => {
     document.documentElement.dataset.colorScheme = theme;
@@ -27,7 +35,7 @@ export default function App() {
   };
 
   const deleteAllHistory = async () => {
-    if (!window.confirm("Delete all chat history and local files?")) {
+    if (!window.confirm(`${UI_LABELS.deleteAll} chat history and local files?`)) {
       return;
     }
 
@@ -37,7 +45,19 @@ export default function App() {
       return;
     }
 
+    localStorage.removeItem("chatkit-persistent-thread");
     window.location.reload();
+  };
+
+  const handleThreadChange = (threadId: string | null) => {
+    if (chatMode === "persistent") {
+      setPersistentThreadId(threadId);
+      if (threadId) {
+        localStorage.setItem("chatkit-persistent-thread", threadId);
+      } else {
+        localStorage.removeItem("chatkit-persistent-thread");
+      }
+    }
   };
 
   return (
@@ -47,18 +67,51 @@ export default function App() {
           ChatKit
         </h1>
 
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-        >
-          {theme === "dark" ? "☀ Light" : "🌙 Dark"}
-        </button>
+        <div className="flex items-center gap-4">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <span>{UI_LABELS.temporary}</span>
+            <input
+              type="checkbox"
+              checked={chatMode === "temporary"}
+              onChange={(event) => {
+                setChatMode(event.target.checked ? "temporary" : "persistent");
+              }}
+              className="peer sr-only"
+              aria-label="Use temporary chat without history"
+            />
+            <span className="relative h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-amber-500 peer-checked:[&>span]:translate-x-5 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-amber-500 dark:bg-slate-700">
+              <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform" />
+            </span>
+          </label>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            aria-label={`${UI_LABELS.switchTo} ${theme === "dark" ? UI_LABELS.light : UI_LABELS.dark}`}
+          >
+            {theme === "dark" ? `☀ ${UI_LABELS.light}` : `🌙 ${UI_LABELS.dark}`}
+          </button>
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 w-full">
-        <ChatKitPanel theme={theme} onDeleteAll={deleteAllHistory} />
+        <ChatKitPanel
+          theme={theme}
+          mode="persistent"
+          active={chatMode === "persistent"}
+          initialThread={persistentThreadId}
+          onThreadChange={handleThreadChange}
+          onDeleteAll={deleteAllHistory}
+        />
+        <ChatKitPanel
+          theme={theme}
+          mode="temporary"
+          active={chatMode === "temporary"}
+          initialThread={null}
+          onThreadChange={() => undefined}
+          onDeleteAll={deleteAllHistory}
+        />
       </div>
     </main >
   );

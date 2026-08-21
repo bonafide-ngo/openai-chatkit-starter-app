@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
+from .memory_store import EphemeralStore
 from .server import GENERATED_FILES, StarterChatServer, delete_all_generated_files
 
 
@@ -43,13 +44,18 @@ async def allow_private_network_preflight(request: Request, call_next):
     return response
 
 chatkit_server = StarterChatServer()
+temporary_chatkit_server = StarterChatServer(
+    store=EphemeralStore()
+)
 
 
-@app.post("/chatkit")
-async def chatkit_endpoint(request: Request) -> Response:
+async def process_chatkit_request(
+    request: Request,
+    server: StarterChatServer,
+) -> Response:
     """Proxy the ChatKit web component payload to the server implementation."""
     payload = await request.body()
-    result = await chatkit_server.process(payload, {"request": request})
+    result = await server.process(payload, {"request": request})
 
     if isinstance(result, StreamingResult):
         return StreamingResponse(result, media_type="text/event-stream")
@@ -58,6 +64,16 @@ async def chatkit_endpoint(request: Request) -> Response:
         return Response(content=result.json, media_type="application/json")
 
     return JSONResponse(result)
+
+
+@app.post("/chatkit")
+async def chatkit_endpoint(request: Request) -> Response:
+    return await process_chatkit_request(request, chatkit_server)
+
+
+@app.post("/chatkit/temporary")
+async def temporary_chatkit_endpoint(request: Request) -> Response:
+    return await process_chatkit_request(request, temporary_chatkit_server)
 
 
 @app.delete("/chatkit/threads")

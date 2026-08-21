@@ -12,6 +12,7 @@ responses, web search, code execution, and file analysis.
 - Automatic thread titles
 - Light and dark themes
 - Persistent local chat history
+- Temporary chats without history
 - Per-thread and delete-all history controls
 
 ## Run It

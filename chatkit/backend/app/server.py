@@ -224,8 +224,8 @@ def make_thread_title(item: UserMessageItem | None) -> str:
 class StarterChatServer(ChatKitServer[dict[str, Any]]):
     """Server implementation that keeps conversation state in memory."""
 
-    def __init__(self) -> None:
-        self.store = MemoryStore(
+    def __init__(self, store: MemoryStore | None = None) -> None:
+        self.store = store or MemoryStore(
             cleanup_thread_files=delete_generated_files_for_thread
         )
         self.attachment_store = MemoryAttachmentStore()

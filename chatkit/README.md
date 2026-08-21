@@ -29,7 +29,6 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
 | `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
 | `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_localhost_dev` | ChatKit domain key. |
-| `CHATKIT_STORE_MODE` | `file` | Use `file` or `memory` storage. |
 | `CHATKIT_STORE_PATH` | `backend/.data/chatkit-store.json` | File-store location. |
 | `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
 | `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
@@ -40,16 +39,20 @@ this file for `VITE_*` variables.
 
 ## Storage and Privacy
 
-File storage is enabled by default. Full thread content, including questions
-and answers, is saved in the configured JSON store and survives backend
-restarts. The local `.data` directory is excluded from Git and is created on
-first write.
+Persistent file storage is always used for normal chats. Full thread content,
+including questions and answers, is saved in the configured JSON store and
+survives backend restarts. The local `.data` directory is excluded from Git
+and is created on first write.
 
-Use memory-only storage when persistence is not wanted:
+Use the `Temporary` toggle in the header to choose the conversation mode:
 
-```env
-CHATKIT_STORE_MODE=memory
-```
+- Toggle off uses persistent storage and includes chats in history.
+- Toggle on uses an in-memory store, omits chats from history, and discards
+	them when the backend restarts.
+
+Switching the toggle starts a new conversation. The persistent and temporary
+ChatKit sessions remain separate, so switching back restores persistent
+history and its selected thread without adding or removing anything.
 
 The `Delete all` action removes all local threads, messages, attachment
 metadata, uploaded files, generated files, and persisted history. Files already
@@ -88,10 +91,11 @@ tab may still have failed before the backend was ready.
 This is expected without `CHATKIT_PUBLIC_BASE_URL`. Use an HTTPS tunnel for
 real previews; CORS settings cannot override browser loopback restrictions.
 
-### History is empty after switching modes
+### Persistent history does not appear after switching modes
 
-`file` and `memory` modes use different lifecycles. Set `CHATKIT_STORE_MODE=file`
-and verify `CHATKIT_STORE_PATH` points to the existing store file.
+Make sure the persistent session is selected by turning the `Temporary` toggle
+off. Persistent history is stored at `CHATKIT_STORE_PATH` and is independent
+of the temporary session.
 
 ## Customize
 

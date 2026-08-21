@@ -26,9 +26,6 @@ class MemoryStore(Store[dict]):
         self.items: dict[str, list[ThreadItem]] = defaultdict(list)
         self.attachments: dict[str, Attachment] = {}
         self.cleanup_thread_files = cleanup_thread_files
-        self.mode = os.getenv("CHATKIT_STORE_MODE", "file").strip().lower()
-        if self.mode not in {"file", "memory"}:
-            raise ValueError("CHATKIT_STORE_MODE must be either 'file' or 'memory'")
         self.path = Path(os.getenv("CHATKIT_STORE_PATH", str(DEFAULT_STORE_PATH)))
         self._load()
 
@@ -159,9 +156,6 @@ class MemoryStore(Store[dict]):
         self._persist()
 
     def _load(self) -> None:
-        if self.mode == "memory":
-            return
-
         if not self.path.is_file():
             return
 
@@ -186,9 +180,6 @@ class MemoryStore(Store[dict]):
             raise RuntimeError(f"Unable to load ChatKit store at {self.path}") from error
 
     def _persist(self) -> None:
-        if self.mode == "memory":
-            return
-
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.parent.chmod(0o700)
         data = {
@@ -238,3 +229,18 @@ class MemoryStore(Store[dict]):
         has_more = start + limit < len(sorted_rows)
         next_after = cursor_key(data[-1]) if has_more and data else None
         return Page(data=data, has_more=has_more, after=next_after)
+
+
+class EphemeralStore(MemoryStore):
+    """In-memory store whose threads never appear in the history listing."""
+
+    def _load(self) -> None:
+        return
+
+    def _persist(self) -> None:
+        return
+
+    async def load_threads(
+        self, limit: int, after: str | None, order: str, context: dict
+    ) -> Page[ThreadMetadata]:
+        return Page(data=[], has_more=False, after=None)
