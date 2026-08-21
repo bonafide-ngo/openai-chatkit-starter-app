@@ -60,6 +60,15 @@ export default function App() {
     }
   };
 
+  const handlePersistentChatkitError = () => {
+    if (!persistentThreadId) {
+      return;
+    }
+
+    localStorage.removeItem("chatkit-persistent-thread");
+    window.location.reload();
+  };
+
   return (
     <main className="flex h-screen w-screen flex-col overflow-hidden bg-slate-100 dark:bg-slate-950">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
@@ -102,6 +111,7 @@ export default function App() {
           active={chatMode === "persistent"}
           initialThread={persistentThreadId}
           onThreadChange={handleThreadChange}
+          onChatkitError={handlePersistentChatkitError}
           onDeleteAll={deleteAllHistory}
         />
         <ChatKitPanel

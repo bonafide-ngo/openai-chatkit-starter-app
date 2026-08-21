@@ -11,6 +11,7 @@ type Theme = "light" | "dark";
 interface ChatKitPanelProps {
   theme: Theme;
   onDeleteAll: () => Promise<void>;
+  onChatkitError?: (error: Error) => void;
   mode: "persistent" | "temporary";
   initialThread: string | null;
   onThreadChange: (threadId: string | null) => void;
@@ -20,6 +21,7 @@ interface ChatKitPanelProps {
 export function ChatKitPanel({
   theme,
   onDeleteAll,
+  onChatkitError,
   mode,
   initialThread,
   onThreadChange,
@@ -38,6 +40,11 @@ export function ChatKitPanel({
     initialThread,
     onChatkitThreadChange: ({ threadId }) => {
       onThreadChange(typeof threadId === "string" ? threadId : null);
+    },
+    onChatkitError: ({ error }) => {
+      onChatkitError?.(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     },
     header: {
       ...(mode === "persistent"
