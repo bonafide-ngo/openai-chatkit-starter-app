@@ -1,16 +1,30 @@
-# OpenAI ChatKit Starter Templates
+# OpenAI ChatKit Starter
 
-This repository contains two starter apps as reference implementations of minimal ChatKit integrations.
+A self-hosted ChatKit example with a React frontend and FastAPI backend. The
+backend keeps conversation state locally and uses the OpenAI Agents SDK for
+responses, web search, code execution, and file analysis.
 
-You can run the following examples:
+## Features
 
-- [**ChatKit**](chatkit) - example of a self-hosted ChatKit integration.
-- [**Managed ChatKit**](managed-chatkit) – example of a managed ChatKit integration with hosted workflows.
+- Streaming assistant responses
+- Web search and code interpreter tools
+- Image and document uploads
+- Automatic thread titles
+- Light and dark themes
+- Persistent local chat history
+- Per-thread and delete-all history controls
 
-## Enhancements implemented
-- Web search
-- Code interpreter
-- File/Image upload and processing
-- Light/Dark theme switcher
-- Autogenerate title
-- Optimised ChatKit interface
+## Run It
+
+```bash
+cd chatkit
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The command starts both
+services. The frontend waits for the backend before starting, so the first
+ChatKit request does not race backend startup.
+
+See the [ChatKit guide](chatkit/README.md) for configuration, storage, file
+uploads, and deployment notes.

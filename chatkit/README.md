@@ -1,29 +1,97 @@
 # ChatKit Starter
 
-Minimal Vite + React UI paired with a FastAPI backend that forwards chat
-requests to OpenAI through the ChatKit server library.
+React and Vite frontend paired with a FastAPI backend. The backend uses the
+OpenAI Agents SDK with ChatKit for streaming responses, web search, code
+interpreter sessions, and file analysis.
 
-## Quick start
+## Quick Start
 
 ```bash
 npm install
 npm run dev
 ```
 
-What happens:
+The frontend is available at `http://localhost:3000`. The backend runs at
+`http://127.0.0.1:8000`. `npm run dev` waits for the backend health endpoint
+before starting Vite.
 
-- `npm run dev` starts the FastAPI backend on `127.0.0.1:8000` and the Vite
-  frontend on `127.0.0.1:3000` with a proxy at `/chatkit`.
+The backend startup script creates `backend/.venv` and installs dependencies.
+Set `OPENAI_API_KEY` before starting the app, or place it in
+`chatkit/.env.local`.
 
-## Required environment
+## Configuration
 
-- `OPENAI_API_KEY` (backend)
-- `VITE_CHATKIT_API_URL` (optional, defaults to `/chatkit`)
-- `VITE_CHATKIT_API_DOMAIN_KEY` (optional, defaults to `domain_pk_localhost_dev`)
+Copy `.env.example` to `.env.local` and update the values as needed:
 
-Set `OPENAI_API_KEY` in your shell or in `.env.local` at the repo root before
-running the backend. Register a production domain key in the OpenAI dashboard
-and set `VITE_CHATKIT_API_DOMAIN_KEY` when deploying.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | none | Backend authentication with OpenAI. |
+| `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
+| `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
+| `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_localhost_dev` | ChatKit domain key. |
+| `CHATKIT_STORE_MODE` | `file` | Use `file` or `memory` storage. |
+| `CHATKIT_STORE_PATH` | `backend/.data/chatkit-store.json` | File-store location. |
+| `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
+| `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
+| `CHATKIT_PUBLIC_BASE_URL` | none | Public HTTPS URL for previews and downloads. |
+
+Environment variables are loaded from `chatkit/.env.local`. Vite also uses
+this file for `VITE_*` variables.
+
+## Storage and Privacy
+
+File storage is enabled by default. Full thread content, including questions
+and answers, is saved in the configured JSON store and survives backend
+restarts. The local `.data` directory is excluded from Git and is created on
+first write.
+
+Use memory-only storage when persistence is not wanted:
+
+```env
+CHATKIT_STORE_MODE=memory
+```
+
+The `Delete all` action removes all local threads, messages, attachment
+metadata, uploaded files, generated files, and persisted history. Files already
+stored remotely by OpenAI are outside this local cleanup operation.
+
+## File Previews and Downloads
+
+The hosted ChatKit UI runs in an HTTPS iframe. Browsers cannot let it fetch
+files from `127.0.0.1`, so local image previews use a placeholder by default.
+To enable real previews and generated-file downloads, expose the backend over
+HTTPS:
+
+```bash
+ngrok http 8000
+```
+
+Then set the tunnel URL:
+
+```env
+CHATKIT_PUBLIC_BASE_URL=https://your-tunnel.ngrok-free.app
+```
+
+Restart the app and upload or generate a new file. Existing messages retain
+their original URLs.
+
+## Troubleshooting
+
+### Frontend reports `ECONNREFUSED 127.0.0.1:8000`
+
+Wait for the backend startup to finish, or restart with `npm run dev`. The
+frontend startup includes a readiness check, but requests from an old browser
+tab may still have failed before the backend was ready.
+
+### Image preview is a placeholder
+
+This is expected without `CHATKIT_PUBLIC_BASE_URL`. Use an HTTPS tunnel for
+real previews; CORS settings cannot override browser loopback restrictions.
+
+### History is empty after switching modes
+
+`file` and `memory` modes use different lifecycles. Set `CHATKIT_STORE_MODE=file`
+and verify `CHATKIT_STORE_PATH` points to the existing store file.
 
 ## Customize
 

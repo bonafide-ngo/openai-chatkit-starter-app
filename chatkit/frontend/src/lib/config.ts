@@ -3,8 +3,23 @@ const readEnvString = (value: unknown): string | undefined =>
     ? value.trim()
     : undefined;
 
-export const CHATKIT_API_URL = "http://localhost:8000/chatkit";
-//  readEnvString(import.meta.env.VITE_CHATKIT_API_URL) ?? "/chatkit";
+const configuredApiUrl = readEnvString(import.meta.env.VITE_CHATKIT_API_URL);
+
+const isLoopbackUrl = (value: string): boolean => {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+};
+
+export const CHATKIT_API_URL =
+  configuredApiUrl && !isLoopbackUrl(configuredApiUrl)
+    ? configuredApiUrl
+    : "/chatkit";
+
+export const CHATKIT_DELETE_ALL_URL = `${CHATKIT_API_URL.replace(/\/$/, "")}/threads`;
 
 /**
  * ChatKit requires a domain key at runtime. Use the local fallback while

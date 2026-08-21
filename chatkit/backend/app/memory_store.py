@@ -6,15 +6,31 @@ A production app would implement this using a persistant database.
 from __future__ import annotations
 
 from collections import defaultdict
+import json
+import os
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from chatkit.store import NotFoundError, Store
 from chatkit.types import Attachment, Page, ThreadItem, ThreadMetadata
+from pydantic import TypeAdapter
+
+UPLOAD_DIR = Path("/tmp/chatkit-uploads")
+DEFAULT_STORE_PATH = Path(__file__).resolve().parents[1] / ".data" / "chatkit-store.json"
+THREAD_ITEM_ADAPTER = TypeAdapter(ThreadItem)
+ATTACHMENT_ADAPTER = TypeAdapter(Attachment)
 
 class MemoryStore(Store[dict]):
-    def __init__(self):
+    def __init__(self, cleanup_thread_files=None):
         self.threads: dict[str, ThreadMetadata] = {}
         self.items: dict[str, list[ThreadItem]] = defaultdict(list)
         self.attachments: dict[str, Attachment] = {}
+        self.cleanup_thread_files = cleanup_thread_files
+        self.mode = os.getenv("CHATKIT_STORE_MODE", "file").strip().lower()
+        if self.mode not in {"file", "memory"}:
+            raise ValueError("CHATKIT_STORE_MODE must be either 'file' or 'memory'")
+        self.path = Path(os.getenv("CHATKIT_STORE_PATH", str(DEFAULT_STORE_PATH)))
+        self._load()
 
     async def load_thread(self, thread_id: str, context: dict) -> ThreadMetadata:
         if thread_id not in self.threads:
@@ -23,6 +39,7 @@ class MemoryStore(Store[dict]):
 
     async def save_thread(self, thread: ThreadMetadata, context: dict) -> None:
         self.threads[thread.id] = thread
+        self._persist()
 
     async def load_threads(
         self, limit: int, after: str | None, order: str, context: dict
@@ -54,6 +71,7 @@ class MemoryStore(Store[dict]):
         self, thread_id: str, item: ThreadItem, context: dict
     ) -> None:
         self.items[thread_id].append(item)
+        self._persist()
 
     async def save_attachment(
         self,
@@ -61,6 +79,7 @@ class MemoryStore(Store[dict]):
         context: dict,
     ) -> None:
         self.attachments[attachment.id] = attachment
+        self._persist()
 
     async def load_attachment(
         self,
@@ -80,14 +99,17 @@ class MemoryStore(Store[dict]):
         context: dict,
     ) -> None:
         self.attachments.pop(attachment_id, None)
+        self._persist()
 
     async def save_item(self, thread_id: str, item: ThreadItem, context: dict) -> None:
         items = self.items[thread_id]
         for idx, existing in enumerate(items):
             if existing.id == item.id:
                 items[idx] = item
+                self._persist()
                 return
         items.append(item)
+        self._persist()
 
     async def load_item(
         self, thread_id: str, item_id: str, context: dict
@@ -109,6 +131,24 @@ class MemoryStore(Store[dict]):
 
         for attachment_id in attachment_ids:
             self.attachments.pop(attachment_id, None)
+            (UPLOAD_DIR / attachment_id).unlink(missing_ok=True)
+        if self.cleanup_thread_files is not None:
+            self.cleanup_thread_files(thread_id)
+        self._persist()
+
+    async def delete_all(self, context: dict) -> None:
+        for thread_id in list(self.threads):
+            if self.cleanup_thread_files is not None:
+                self.cleanup_thread_files(thread_id)
+
+        self.threads.clear()
+        self.items.clear()
+        self.attachments.clear()
+
+        for path in UPLOAD_DIR.iterdir() if UPLOAD_DIR.exists() else []:
+            if path.is_file():
+                path.unlink()
+        self._persist()
 
     async def delete_thread_item(
         self, thread_id: str, item_id: str, context: dict
@@ -116,6 +156,67 @@ class MemoryStore(Store[dict]):
         self.items[thread_id] = [
             item for item in self.items.get(thread_id, []) if item.id != item_id
         ]
+        self._persist()
+
+    def _load(self) -> None:
+        if self.mode == "memory":
+            return
+
+        if not self.path.is_file():
+            return
+
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            self.threads = {
+                thread_id: ThreadMetadata.model_validate(thread)
+                for thread_id, thread in data.get("threads", {}).items()
+            }
+            self.items = defaultdict(
+                list,
+                {
+                    thread_id: [THREAD_ITEM_ADAPTER.validate_python(item) for item in items]
+                    for thread_id, items in data.get("items", {}).items()
+                },
+            )
+            self.attachments = {
+                attachment_id: ATTACHMENT_ADAPTER.validate_python(attachment)
+                for attachment_id, attachment in data.get("attachments", {}).items()
+            }
+        except (OSError, json.JSONDecodeError, ValueError) as error:
+            raise RuntimeError(f"Unable to load ChatKit store at {self.path}") from error
+
+    def _persist(self) -> None:
+        if self.mode == "memory":
+            return
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.chmod(0o700)
+        data = {
+            "threads": {
+                thread_id: thread.model_dump(mode="json")
+                for thread_id, thread in self.threads.items()
+            },
+            "items": {
+                thread_id: [item.model_dump(mode="json") for item in items]
+                for thread_id, items in self.items.items()
+            },
+            "attachments": {
+                attachment_id: attachment.model_dump(mode="json")
+                for attachment_id, attachment in self.attachments.items()
+            },
+        }
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=self.path.parent,
+            prefix=f".{self.path.name}.",
+            delete=False,
+        ) as temporary_file:
+            json.dump(data, temporary_file, ensure_ascii=True, separators=(",", ":"))
+            temporary_path = Path(temporary_file.name)
+        temporary_path.chmod(0o600)
+        temporary_path.replace(self.path)
+        self.path.chmod(0o600)
 
     def _paginate(
         self,

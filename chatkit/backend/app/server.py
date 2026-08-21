@@ -2,22 +2,72 @@
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator
-
 import base64
+import os
 from pathlib import Path
+from typing import Any, AsyncIterator
+from uuid import uuid4
 
-from agents import Agent, CodeInterpreterTool, Runner, WebSearchTool
-from chatkit.agents import AgentContext, simple_to_agent_input, stream_agent_response, ThreadItemConverter
+from agents import (
+    Agent,
+    CodeInterpreterTool,
+    RawResponsesStreamEvent,
+    Runner,
+    WebSearchTool,
+)
+from chatkit.agents import (
+    AgentContext,
+    ResponseStreamConverter,
+    simple_to_agent_input,
+    stream_agent_response,
+    ThreadItemConverter,
+)
 from chatkit.server import ChatKitServer
-from chatkit.types import ThreadMetadata, ThreadStreamEvent, UserMessageItem, Attachment, ImageAttachment
+from chatkit.types import (
+    Annotation,
+    Attachment,
+    ImageAttachment,
+    ThreadMetadata,
+    ThreadStreamEvent,
+    URLSource,
+    UserMessageItem,
+)
+from openai import AsyncOpenAI
 
-from .attachment_store import MemoryAttachmentStore
+from .attachment_store import (
+    MAX_ATTACHMENT_BYTES,
+    UPLOAD_DIR,
+    MemoryAttachmentStore,
+    public_base_url,
+)
 from .memory_store import MemoryStore
 
 
 MAX_RECENT_ITEMS = 30
-MODEL = "gpt-5.6-luna"
+MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+TEXT_FILE_MIME_TYPES = {
+    "text/x-python-script",
+    "text/x-python",
+    "application/javascript",
+    "text/javascript",
+    "application/x-javascript",
+}
+GENERATED_FILE_DIR = Path("/tmp/chatkit-generated-files")
+GENERATED_FILE_DIR.mkdir(parents=True, exist_ok=True)
+GENERATED_FILES: dict[str, tuple[Path, str, str | None]] = {}
+
+
+def delete_generated_files_for_thread(thread_id: str) -> None:
+    for file_id, (path, _, generated_thread_id) in list(GENERATED_FILES.items()):
+        if generated_thread_id == thread_id:
+            path.unlink(missing_ok=True)
+            GENERATED_FILES.pop(file_id, None)
+
+
+def delete_all_generated_files() -> None:
+    for path, _, _ in list(GENERATED_FILES.values()):
+        path.unlink(missing_ok=True)
+    GENERATED_FILES.clear()
 
 
 assistant_agent = Agent[AgentContext[dict[str, Any]]](
@@ -39,19 +89,32 @@ assistant_agent = Agent[AgentContext[dict[str, Any]]](
         "Use web search when the user asks for current or up-to-date information. "
         "Use the code interpreter when calculations, data analysis, "
         "Python execution, or generating/analyzing data would be useful. "
-        "When the user uploads a file, inspect and analyze it when relevant."
+        "When the user uploads a file, inspect and analyze it when relevant. "
+        "When you create a file for the user, include a Markdown download link "
+        "using the exact sandbox:/mnt/data/<filename> URL returned by the tool. "
+        "Do not add any other links for that file."
     ),
 )
 
 class StarterAttachmentConverter(ThreadItemConverter):
+    @staticmethod
+    def _file_mime_type(attachment: Attachment) -> str:
+        mime_type = attachment.mime_type.split(";", 1)[0].lower()
+        if mime_type in TEXT_FILE_MIME_TYPES:
+            return "text/plain"
+        return mime_type
+
     async def attachment_to_message_content(
         self,
         attachment: Attachment,
     ):
-        path = Path("/tmp/chatkit-uploads") / attachment.id
+        path = (UPLOAD_DIR / attachment.id).resolve()
 
-        if not path.exists():
+        if path.parent != UPLOAD_DIR.resolve() or not path.is_file():
             raise FileNotFoundError(f"Uploaded file not found: {path}")
+
+        if path.stat().st_size > MAX_ATTACHMENT_BYTES:
+            raise ValueError("Uploaded file exceeds the configured size limit")
 
         data = base64.b64encode(path.read_bytes()).decode("utf-8")
 
@@ -61,11 +124,77 @@ class StarterAttachmentConverter(ThreadItemConverter):
                 "image_url": f"data:{attachment.mime_type};base64,{data}",
             }
 
+        mime_type = self._file_mime_type(attachment)
         return {
             "type": "input_file",
             "filename": attachment.name,
-            "file_data": f"data:{attachment.mime_type};base64,{data}",
+            "file_data": f"data:{mime_type};base64,{data}",
         }
+
+
+class StarterResponseStreamConverter(ResponseStreamConverter):
+    def __init__(self, context: dict[str, Any]) -> None:
+        self.context = context
+        self.openai_client = AsyncOpenAI()
+        self.generated_file_ids: dict[str, str] = {}
+
+    async def prepare_container_file(self, citation) -> None:
+        filename = citation.filename or "generated-file"
+        file_id = uuid4().hex
+        path = GENERATED_FILE_DIR / file_id
+        content = await self.openai_client.containers.files.content.retrieve(
+            citation.file_id,
+            container_id=citation.container_id,
+        )
+        file_bytes = content.read()
+        path.write_bytes(file_bytes)
+        GENERATED_FILES[file_id] = (
+            path,
+            filename,
+            self.context.get("thread_id"),
+        )
+        self.generated_file_ids[citation.file_id] = file_id
+
+    async def container_file_citation_to_annotation(self, citation):
+        await self.prepare_container_file(citation)
+        filename = citation.filename or "generated-file"
+        base_url = public_base_url(self.context)
+        if base_url is None:
+            request = self.context.get("request")
+            base_url = str(request.base_url).rstrip("/") if request else ""
+        return Annotation(
+            source=URLSource(
+                url=(
+                    f"{base_url}/chatkit/generated/"
+                    f"{self.generated_file_ids[citation.file_id]}"
+                ),
+                title=f"Download {filename}",
+            ),
+            index=citation.end_index,
+        )
+
+
+class AnnotationCompatibleResult:
+    def __init__(self, result, converter: StarterResponseStreamConverter) -> None:
+        self.result = result
+        self.converter = converter
+
+    async def stream_events(self):
+        async for event in self.result.stream_events():
+            if event.type == "raw_response_event":
+                response_event = event.data
+            if (
+                event.type == "raw_response_event"
+                and event.data.type == "response.output_text.annotation.added"
+                and hasattr(event.data.annotation, "model_dump")
+            ):
+                event = RawResponsesStreamEvent(
+                    data=event.data.model_copy(
+                        update={"annotation": event.data.annotation.model_dump()}
+                    ),
+                    type=event.type,
+                )
+            yield event
 
 def make_thread_title(item: UserMessageItem | None) -> str:
     if item is None:
@@ -96,7 +225,9 @@ class StarterChatServer(ChatKitServer[dict[str, Any]]):
     """Server implementation that keeps conversation state in memory."""
 
     def __init__(self) -> None:
-        self.store = MemoryStore()
+        self.store = MemoryStore(
+            cleanup_thread_files=delete_generated_files_for_thread
+        )
         self.attachment_store = MemoryAttachmentStore()
 
         super().__init__(
@@ -125,10 +256,6 @@ class StarterChatServer(ChatKitServer[dict[str, Any]]):
 
         items = list(reversed(items_page.data))
      
-        print("CHATKIT ITEMS:")
-        for chat_item in items:
-          print(chat_item)
-
         converter = StarterAttachmentConverter()
         agent_input = await converter.to_agent_input(items)
 
@@ -144,12 +271,12 @@ class StarterChatServer(ChatKitServer[dict[str, Any]]):
             context=agent_context,
         )
 
-        #async for event in stream_agent_response(agent_context, result):
-        #    yield event
-
-        try:
-            async for event in stream_agent_response(agent_context, result):
-                yield event
-        except ValueError as e:
-            if "AnnotationFilePath" not in str(e):
-                raise
+        response_converter = StarterResponseStreamConverter(
+            {**context, "thread_id": thread.id}
+        )
+        async for event in stream_agent_response(
+            agent_context,
+            AnnotationCompatibleResult(result, response_converter),
+            converter=response_converter,
+        ):
+            yield event

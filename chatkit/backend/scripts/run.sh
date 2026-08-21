@@ -35,6 +35,10 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
   exit 1
 fi
 
+if [ -z "${CHATKIT_PUBLIC_BASE_URL:-}" ]; then
+  echo "Warning: CHATKIT_PUBLIC_BASE_URL is not set; image previews require an HTTPS tunnel or deployed backend URL."
+fi
+
 echo "Starting ChatKit backend on http://127.0.0.1:8000 ..."
 exec uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChatKitPanel } from "./components/ChatKitPanel";
+import { CHATKIT_DELETE_ALL_URL } from "./lib/config";
 
 type Theme = "light" | "dark";
 
@@ -25,6 +26,20 @@ export default function App() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   };
 
+  const deleteAllHistory = async () => {
+    if (!window.confirm("Delete all chat history and local files?")) {
+      return;
+    }
+
+    const response = await fetch(CHATKIT_DELETE_ALL_URL, { method: "DELETE" });
+    if (!response.ok) {
+      window.alert("Unable to delete chat history.");
+      return;
+    }
+
+    window.location.reload();
+  };
+
   return (
     <main className="flex h-screen w-screen flex-col overflow-hidden bg-slate-100 dark:bg-slate-950">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
@@ -43,8 +58,8 @@ export default function App() {
       </header>
 
       <div className="min-h-0 flex-1 w-full">
-      	<ChatKitPanel theme={theme} />
+        <ChatKitPanel theme={theme} onDeleteAll={deleteAllHistory} />
       </div>
-    </main>
+    </main >
   );
 }

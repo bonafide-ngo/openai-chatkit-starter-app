@@ -5,9 +5,10 @@ type Theme = "light" | "dark";
 
 interface ChatKitPanelProps {
   theme: Theme;
+  onDeleteAll: () => Promise<void>;
 }
 
-export function ChatKitPanel({ theme }: ChatKitPanelProps) {
+export function ChatKitPanel({ theme, onDeleteAll }: ChatKitPanelProps) {
   const chatkit = useChatKit({
     api: {
       url: CHATKIT_API_URL,
@@ -17,6 +18,18 @@ export function ChatKitPanel({ theme }: ChatKitPanelProps) {
       },
     },
     theme,
+    header: {
+      rightAction: {
+        icon: "close",
+        onClick: () => {
+          void onDeleteAll();
+        },
+      },
+    },
+    history: {
+      enabled: true,
+      showDelete: true,
+    },
     composer: {
       attachments: {
         enabled: true,
