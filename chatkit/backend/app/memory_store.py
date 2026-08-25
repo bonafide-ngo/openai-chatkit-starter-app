@@ -35,7 +35,10 @@ class MemoryStore(Store[dict]):
         return self.threads[thread_id]
 
     async def save_thread(self, thread: ThreadMetadata, context: dict) -> None:
-        self.threads[thread.id] = thread
+        metadata = ThreadMetadata.model_validate(
+            thread.model_dump(exclude={"items"})
+        )
+        self.threads[metadata.id] = metadata
         self._persist()
 
     async def load_threads(
