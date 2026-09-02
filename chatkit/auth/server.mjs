@@ -23,6 +23,45 @@ const secret = process.env.AUTH_SECRET;
 if (!secret || secret.length < 32) throw new Error("AUTH_SECRET must be at least 32 characters.");
 const publicUrl = process.env.AUTH_PUBLIC_URL || "http://localhost:3000";
 const hasEnv = (...names) => names.every((name) => Boolean(process.env[name]?.trim()));
+const signOutTranslations = {
+    en: ["Signout", "Are you sure you want to sign out?", "Sign out"],
+    de: ["Abmelden", "Möchten Sie sich wirklich abmelden?", "Abmelden"],
+    es: ["Cerrar sesión", "¿Seguro que quieres cerrar sesión?", "Cerrar sesión"],
+    fr: ["Déconnexion", "Voulez-vous vraiment vous déconnecter ?", "Se déconnecter"],
+    it: ["Disconnessione", "Vuoi davvero disconnetterti?", "Disconnetti"],
+    ja: ["サインアウト", "サインアウトしてもよろしいですか？", "サインアウト"],
+    ko: ["로그아웃", "로그아웃하시겠습니까?", "로그아웃"],
+    nl: ["Uitloggen", "Weet je zeker dat je wilt uitloggen?", "Uitloggen"],
+    pl: ["Wylogowanie", "Czy na pewno chcesz się wylogować?", "Wyloguj się"],
+    pt: ["Sair", "Tem certeza de que deseja sair?", "Sair"],
+    ru: ["Выход", "Вы действительно хотите выйти?", "Выйти"],
+    zh: ["退出登录", "确定要退出登录吗？", "退出登录"],
+};
+const signInTranslations = {
+    en: { with: "Sign in with", email: "Email", credentials: "Username / password" },
+    de: { with: "Anmelden mit", email: "E-Mail", credentials: "Benutzername / Passwort" },
+    es: { with: "Iniciar sesión con", email: "Correo electrónico", credentials: "Usuario / contraseña" },
+    fr: { with: "Se connecter avec", email: "E-mail", credentials: "Nom d'utilisateur / mot de passe" },
+    it: { with: "Accedi con", email: "Email", credentials: "Nome utente / password" },
+    ja: { with: "次でサインイン", email: "メールアドレス", credentials: "ユーザー名 / パスワード" },
+    ko: { with: "다음으로 로그인", email: "이메일", credentials: "사용자 이름 / 비밀번호" },
+    nl: { with: "Inloggen met", email: "E-mail", credentials: "Gebruikersnaam / wachtwoord" },
+    pl: { with: "Zaloguj się przez", email: "E-mail", credentials: "Nazwa użytkownika / hasło" },
+    pt: { with: "Entrar com", email: "E-mail", credentials: "Nome de usuário / senha" },
+    ru: { with: "Войти через", email: "Электронная почта", credentials: "Имя пользователя / пароль" },
+    zh: { with: "使用以下方式登录", email: "电子邮件", credentials: "用户名 / 密码" },
+};
+const supportedAuthLocales = new Set(Object.keys(signInTranslations));
+
+function requestLocale(request) {
+    const cookieLocale = request.headers.cookie?.match(/(?:^|;\s*)chatkit-language=([^;]+)/)?.[1];
+    if (cookieLocale && supportedAuthLocales.has(decodeURIComponent(cookieLocale))) return decodeURIComponent(cookieLocale);
+    for (const language of (request.headers["accept-language"] || "").split(",")) {
+        const locale = language.split(";")[0].trim().toLowerCase().split("-")[0];
+        if (supportedAuthLocales.has(locale)) return locale;
+    }
+    return "en";
+}
 const emailServer = process.env.AUTH_EMAIL_SERVER?.includes("://")
     ? process.env.AUTH_EMAIL_SERVER
     : {
@@ -123,7 +162,23 @@ const server = createServer(async (request, response) => {
         body,
         duplex: "half",
     }), authOptions);
+    let responseBody = await result.text();
+    if (request.method === "GET" && request.url === "/api/auth/signout" && responseBody.includes("Are you sure you want to sign out?")) {
+        const translations = signOutTranslations[requestLocale(request)] || signOutTranslations.en;
+        responseBody = responseBody.replaceAll("Signout", translations[0]).replaceAll("Are you sure you want to sign out?", translations[1]).replaceAll("Sign out", translations[2]);
+    }
+    if (request.method === "GET" && request.url === "/api/auth/signin") {
+        const translations = signInTranslations[requestLocale(request)] || signInTranslations.en;
+        responseBody = responseBody
+            .replaceAll("Sign in with Email", `${translations.with} ${translations.email}`)
+            .replaceAll("Sign in with Username / password", `${translations.with} ${translations.credentials}`)
+            .replaceAll("Sign in with Google", `${translations.with} Google`)
+            .replaceAll("Sign in with Microsoft Entra ID", `${translations.with} Microsoft Entra ID`)
+            .replaceAll("Sign in with GitHub", `${translations.with} GitHub`)
+            .replaceAll("Sign in with Apple", `${translations.with} Apple`)
+            .replaceAll(">Email<", `>${translations.email}<`);
+    }
     response.writeHead(result.status, Object.fromEntries(result.headers));
-    response.end(await result.text());
+    response.end(responseBody);
 });
 server.listen(Number(process.env.AUTH_PORT || 3001), "127.0.0.1", () => console.log("Auth.js listening on http://127.0.0.1:3001"));

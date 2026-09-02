@@ -146,6 +146,36 @@ export const CURRENT_UI_LABELS: Record<string, UiLabels> = {
 
 export const UI_LABELS = CURRENT_UI_LABELS[CHATKIT_LOCALE] ?? CURRENT_UI_LABELS.en;
 
+export const SIGN_OUT_LABELS: Record<string, string> = {
+  en: "Sign out",
+  de: "Abmelden",
+  es: "Cerrar sesión",
+  fr: "Se déconnecter",
+  it: "Disconnetti",
+  ja: "サインアウト",
+  ko: "로그아웃",
+  nl: "Uitloggen",
+  pl: "Wyloguj się",
+  pt: "Sair",
+  ru: "Выйти",
+  zh: "退出登录",
+};
+
+export const AUTH_GATE_LABELS: Record<string, { loading: string; description: string; signIn: string }> = {
+  en: { loading: "Loading...", description: "Sign in with an authorised account to continue.", signIn: "Sign in" },
+  de: { loading: "Wird geladen...", description: "Melden Sie sich mit einem autorisierten Konto an, um fortzufahren.", signIn: "Anmelden" },
+  es: { loading: "Cargando...", description: "Inicia sesión con una cuenta autorizada para continuar.", signIn: "Iniciar sesión" },
+  fr: { loading: "Chargement...", description: "Connectez-vous avec un compte autorisé pour continuer.", signIn: "Se connecter" },
+  it: { loading: "Caricamento...", description: "Accedi con un account autorizzato per continuare.", signIn: "Accedi" },
+  ja: { loading: "読み込み中...", description: "続行するには承認済みのアカウントでサインインしてください。", signIn: "サインイン" },
+  ko: { loading: "로드 중...", description: "계속하려면 승인된 계정으로 로그인하세요.", signIn: "로그인" },
+  nl: { loading: "Laden...", description: "Log in met een geautoriseerd account om door te gaan.", signIn: "Inloggen" },
+  pl: { loading: "Ładowanie...", description: "Zaloguj się za pomocą autoryzowanego konta, aby kontynuować.", signIn: "Zaloguj się" },
+  pt: { loading: "Carregando...", description: "Entre com uma conta autorizada para continuar.", signIn: "Entrar" },
+  ru: { loading: "Загрузка...", description: "Войдите с помощью авторизованной учетной записи, чтобы продолжить.", signIn: "Войти" },
+  zh: { loading: "正在加载...", description: "请使用已授权的帐户登录以继续。", signIn: "登录" },
+};
+
 export const EXPORT_LABELS: Record<string, {
   exportChat: string;
   exportPdf: string;

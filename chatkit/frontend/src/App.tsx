@@ -6,11 +6,13 @@ import {
   CHATKIT_API_URL,
   CHATKIT_TEMPORARY_API_URL,
   CHATKIT_LOCALE,
+  AUTH_GATE_LABELS,
   EXPORT_UI_LABELS,
   LANGUAGE_NAMES,
   MISSING_THREAD_MESSAGES,
   SUPPORTED_APP_LOCALES,
   setChatkitLocale,
+  SIGN_OUT_LABELS,
   UI_LABELS,
 } from "./lib/config";
 
@@ -51,7 +53,7 @@ export default function App() {
   }, [theme]);
 
   if (session === undefined) {
-    return <main className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">Loading...</main>;
+    return <main className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">{(AUTH_GATE_LABELS[CHATKIT_LOCALE] ?? AUTH_GATE_LABELS.en).loading}</main>;
   }
 
   if (!session?.user) {
@@ -59,8 +61,8 @@ export default function App() {
       <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6 text-slate-900">
         <section className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
           <h1 className="text-2xl font-semibold">ChatKit</h1>
-          <p className="mt-2 text-sm text-slate-600">Sign in with an authorised account to continue.</p>
-          <a className="mt-6 block rounded-lg bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white hover:bg-slate-700" href="/api/auth/signin">Sign in</a>
+          <p className="mt-2 text-sm text-slate-600">{(AUTH_GATE_LABELS[CHATKIT_LOCALE] ?? AUTH_GATE_LABELS.en).description}</p>
+          <a className="mt-6 block rounded-lg bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white hover:bg-slate-700" href="/api/auth/signin">{(AUTH_GATE_LABELS[CHATKIT_LOCALE] ?? AUTH_GATE_LABELS.en).signIn}</a>
         </section>
       </main>
     );
@@ -195,12 +197,15 @@ export default function App() {
             {theme === "dark" ? `☀ ${UI_LABELS.light}` : `🌙 ${UI_LABELS.dark}`}
           </button>
 
-          <a
-            href="/api/auth/signout"
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "/api/auth/signout";
+            }}
+            className="rounded-lg border border-amber-400 bg-amber-400 px-3 py-1.5 text-sm font-medium text-amber-950 shadow-sm transition hover:border-amber-500 hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400"
           >
-            Sign out
-          </a>
+            {SIGN_OUT_LABELS[CHATKIT_LOCALE] ?? SIGN_OUT_LABELS.en}
+          </button>
         </div>
       </header>
 
