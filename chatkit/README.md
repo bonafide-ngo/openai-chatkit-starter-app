@@ -19,6 +19,37 @@ The backend startup script creates `backend/.venv` and installs dependencies.
 Set `OPENAI_API_KEY` before starting the app, or place it in
 `chatkit/.env.local`.
 
+### Authentication
+
+Authentication runs in the server-only Auth.js service on port `3001`. Copy
+`auth/auth.config.example.json` to `auth/auth.config.json` and replace the
+allowlist with the emails that may sign in. This file is ignored by Git and is
+never loaded by Vite. OAuth credentials and `AUTH_SECRET` belong in `.env.local`.
+
+Add local email/password accounts under `localUsers`; each entry contains only
+`email` and `passwordHash`.
+
+`AUTH_PUBLIC_URL` is the browser-facing URL used for Auth.js redirects. Keep it
+at `http://localhost:3000` for local Vite development; `AUTH_PORT` remains the
+internal Auth.js listening port.
+
+Auth.js exposes Google, Microsoft Entra ID, GitHub, Apple, email magic links,
+and email/password credentials. Configure the OAuth callback URLs as
+`http://localhost:3000/api/auth/callback/<provider>` in development. Magic
+Set `AUTH_EMAIL_SERVER` to the SMTP hostname and `AUTH_EMAIL_PORT` to its port,
+with `AUTH_EMAIL_SECURE=true` for TLS. Optional `AUTH_EMAIL_USERNAME` and
+`AUTH_EMAIL_PASSWORD` configure SMTP authentication. A complete SMTP URL is
+also accepted in `AUTH_EMAIL_SERVER` for compatibility.
+
+To create a password hash for `localUsers`, run:
+
+```bash
+node -e 'const crypto=require("crypto"); const salt=crypto.randomBytes(16).toString("hex"); console.log(`${salt}$${crypto.createHash("sha512").update(`${salt}$${process.argv[1]}`).digest("hex")}`)' 'your-password'
+```
+
+The server also accepts an unsalted SHA-512 digest for compatibility with
+existing local users, but new entries should use the salted format above.
+
 ## Configuration
 
 Copy `.env.example` to `.env.local` and update the values as needed:

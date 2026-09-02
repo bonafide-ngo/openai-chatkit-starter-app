@@ -14,6 +14,7 @@ from chatkit.store import NotFoundError
 from fastapi import File, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+import httpx
 
 from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
 from .memory_store import EphemeralStore
@@ -44,7 +45,7 @@ app.add_middleware(
         if origin.strip()
     ],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -61,6 +62,29 @@ chatkit_server = StarterChatServer()
 temporary_chatkit_server = StarterChatServer(
     store=EphemeralStore()
 )
+
+
+@app.middleware("http")
+async def require_authentication(request: Request, call_next):
+    if request.url.path in {"/health", "/docs", "/openapi.json", "/redoc"} or request.method == "OPTIONS":
+        return await call_next(request)
+    auth_url = os.getenv("AUTH_INTERNAL_URL", "http://127.0.0.1:3001/api/auth/session")
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            auth_response = await client.get(auth_url, headers={
+                "cookie": request.headers.get("cookie", ""),
+                "x-internal-auth": os.getenv("AUTH_INTERNAL_SECRET", ""),
+            })
+    except httpx.HTTPError:
+        return JSONResponse({"detail": "Authentication service unavailable"}, status_code=503)
+    if auth_response.status_code != 200 or not auth_response.json().get("user"):
+        return JSONResponse({"detail": "Authentication required"}, status_code=401)
+    return await call_next(request)
+
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 def vector_store_client() -> AsyncOpenAI:

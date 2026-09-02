@@ -16,8 +16,10 @@ import {
 
 type Theme = "light" | "dark";
 type ChatMode = "persistent" | "temporary";
+type Session = { user?: { name?: string | null; email?: string | null } } | null;
 
 export default function App() {
+  const [session, setSession] = useState<Session | undefined>(undefined);
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("theme");
 
@@ -37,9 +39,32 @@ export default function App() {
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
 
   useEffect(() => {
+    void fetch("/api/auth/session")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((value: Session) => setSession(value))
+      .catch(() => setSession(null));
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.colorScheme = theme;
     localStorage.setItem("theme", theme);
   }, [theme]);
+
+  if (session === undefined) {
+    return <main className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">Loading...</main>;
+  }
+
+  if (!session?.user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6 text-slate-900">
+        <section className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
+          <h1 className="text-2xl font-semibold">ChatKit</h1>
+          <p className="mt-2 text-sm text-slate-600">Sign in with an authorised account to continue.</p>
+          <a className="mt-6 block rounded-lg bg-slate-900 px-4 py-3 text-center text-sm font-medium text-white hover:bg-slate-700" href="/api/auth/signin">Sign in</a>
+        </section>
+      </main>
+    );
+  }
 
   const toggleTheme = () => {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
@@ -169,6 +194,13 @@ export default function App() {
           >
             {theme === "dark" ? `☀ ${UI_LABELS.light}` : `🌙 ${UI_LABELS.dark}`}
           </button>
+
+          <a
+            href="/api/auth/signout"
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Sign out
+          </a>
         </div>
       </header>
 

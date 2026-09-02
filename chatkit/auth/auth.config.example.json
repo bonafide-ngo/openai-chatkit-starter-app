@@ -1,0 +1,11 @@
+{
+    "allowedEmails": [
+        "person@example.com"
+    ],
+    "localUsers": [
+        {
+            "email": "person@example.com",
+            "passwordHash": "salt$replace-with-sha512-hash"
+        }
+    ]
+}
