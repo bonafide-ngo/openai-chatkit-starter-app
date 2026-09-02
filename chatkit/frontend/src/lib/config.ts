@@ -161,19 +161,19 @@ export const SIGN_OUT_LABELS: Record<string, string> = {
   zh: "退出登录",
 };
 
-export const AUTH_GATE_LABELS: Record<string, { loading: string; description: string; signIn: string }> = {
-  en: { loading: "Loading...", description: "Sign in with an authorised account to continue.", signIn: "Sign in" },
-  de: { loading: "Wird geladen...", description: "Melden Sie sich mit einem autorisierten Konto an, um fortzufahren.", signIn: "Anmelden" },
-  es: { loading: "Cargando...", description: "Inicia sesión con una cuenta autorizada para continuar.", signIn: "Iniciar sesión" },
-  fr: { loading: "Chargement...", description: "Connectez-vous avec un compte autorisé pour continuer.", signIn: "Se connecter" },
-  it: { loading: "Caricamento...", description: "Accedi con un account autorizzato per continuare.", signIn: "Accedi" },
-  ja: { loading: "読み込み中...", description: "続行するには承認済みのアカウントでサインインしてください。", signIn: "サインイン" },
-  ko: { loading: "로드 중...", description: "계속하려면 승인된 계정으로 로그인하세요.", signIn: "로그인" },
-  nl: { loading: "Laden...", description: "Log in met een geautoriseerd account om door te gaan.", signIn: "Inloggen" },
-  pl: { loading: "Ładowanie...", description: "Zaloguj się za pomocą autoryzowanego konta, aby kontynuować.", signIn: "Zaloguj się" },
-  pt: { loading: "Carregando...", description: "Entre com uma conta autorizada para continuar.", signIn: "Entrar" },
-  ru: { loading: "Загрузка...", description: "Войдите с помощью авторизованной учетной записи, чтобы продолжить.", signIn: "Войти" },
-  zh: { loading: "正在加载...", description: "请使用已授权的帐户登录以继续。", signIn: "登录" },
+export const AUTH_GATE_LABELS: Record<string, { loading: string; description: string; signIn: string; maintenance: string }> = {
+  en: { loading: "Loading...", description: "Sign in with an authorised account to continue.", signIn: "Sign in", maintenance: "The system is temporarily unavailable for maintenance." },
+  de: { loading: "Wird geladen...", description: "Melden Sie sich mit einem autorisierten Konto an, um fortzufahren.", signIn: "Anmelden", maintenance: "Das System ist wegen Wartungsarbeiten vorübergehend nicht verfügbar." },
+  es: { loading: "Cargando...", description: "Inicia sesión con una cuenta autorizada para continuar.", signIn: "Iniciar sesión", maintenance: "El sistema no está disponible temporalmente por mantenimiento." },
+  fr: { loading: "Chargement...", description: "Connectez-vous avec un compte autorisé pour continuer.", signIn: "Se connecter", maintenance: "Le système est temporairement indisponible pour maintenance." },
+  it: { loading: "Caricamento...", description: "Accedi con un account autorizzato per continuare.", signIn: "Accedi", maintenance: "Il sistema non è temporaneamente disponibile per manutenzione." },
+  ja: { loading: "読み込み中...", description: "続行するには承認済みのアカウントでサインインしてください。", signIn: "サインイン", maintenance: "メンテナンスのため、システムは一時的にご利用いただけません。" },
+  ko: { loading: "로드 중...", description: "계속하려면 승인된 계정으로 로그인하세요.", signIn: "로그인", maintenance: "시스템 점검으로 인해 일시적으로 이용할 수 없습니다." },
+  nl: { loading: "Laden...", description: "Log in met een geautoriseerd account om door te gaan.", signIn: "Inloggen", maintenance: "Het systeem is tijdelijk niet beschikbaar wegens onderhoud." },
+  pl: { loading: "Ładowanie...", description: "Zaloguj się za pomocą autoryzowanego konta, aby kontynuować.", signIn: "Zaloguj się", maintenance: "System jest tymczasowo niedostępny z powodu konserwacji." },
+  pt: { loading: "Carregando...", description: "Entre com uma conta autorizada para continuar.", signIn: "Entrar", maintenance: "O sistema está temporariamente indisponível para manutenção." },
+  ru: { loading: "Загрузка...", description: "Войдите с помощью авторизованной учетной записи, чтобы продолжить.", signIn: "Войти", maintenance: "Система временно недоступна из-за технического обслуживания." },
+  zh: { loading: "正在加载...", description: "请使用已授权的帐户登录以继续。", signIn: "登录", maintenance: "系统正在维护，暂时无法使用。" },
 };
 
 export const EXPORT_LABELS: Record<string, {

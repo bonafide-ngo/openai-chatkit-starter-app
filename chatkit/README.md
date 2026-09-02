@@ -45,6 +45,10 @@ Set `AUTH_EMAIL_LINK=false` to hide email magic-link login, or
 `AUTH_EMAIL_LOCAL=false` to hide local email/password login. Both default to
 `true`; local email/password login is shown only when `localUsers` is non-empty.
 
+Set `CHATKIT_MAINTENANCE=true` in `.env.local` to disable the complete system.
+The frontend shows only a maintenance message, while backend and Auth.js
+requests are rejected. Restart the development stack after changing this flag.
+
 Auth.js settings are kept separately from the application settings. Copy
 `.env.auth.example` to `.env.auth.local` and put all `AUTH_*` values there. The Auth.js
 launcher watches `.env.auth.local` and `auth/auth.config.local.json`, restarting

@@ -12,11 +12,14 @@ const serverFile = path.join(root, "auth", "server.mjs");
 
 function readAuthEnvironment() {
     const authValues = existsSync(authFile) ? dotenv.parse(readFileSync(authFile)) : {};
-    const authEntries = Object.entries(authValues).filter(([key]) => key.startsWith("AUTH_"));
-    if (authEntries.length > 0) return Object.fromEntries(authEntries);
-    if (!existsSync(legacyEnvFile)) return {};
-    const legacyValues = dotenv.parse(readFileSync(legacyEnvFile));
-    return Object.fromEntries(Object.entries(legacyValues).filter(([key]) => key.startsWith("AUTH_")));
+    const authEntries = Object.entries(authValues).filter(([key]) => key.startsWith("AUTH_") || key === "CHATKIT_MAINTENANCE");
+        const legacyValues = existsSync(legacyEnvFile) ? dotenv.parse(readFileSync(legacyEnvFile)) : {};
+        const environment = Object.fromEntries(authEntries);
+        if (legacyValues.CHATKIT_MAINTENANCE !== undefined && environment.CHATKIT_MAINTENANCE === undefined) {
+            environment.CHATKIT_MAINTENANCE = legacyValues.CHATKIT_MAINTENANCE;
+        }
+        if (authEntries.length > 0) return environment;
+        return Object.fromEntries(Object.entries(legacyValues).filter(([key]) => key.startsWith("AUTH_") || key === "CHATKIT_MAINTENANCE"));
 }
 
 let child;

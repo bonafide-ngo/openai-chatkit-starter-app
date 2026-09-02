@@ -22,6 +22,7 @@ type Session = { user?: { name?: string | null; email?: string | null } } | null
 
 export default function App() {
   const [session, setSession] = useState<Session | undefined>(undefined);
+  const [maintenance, setMaintenance] = useState<boolean | undefined>(undefined);
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("theme");
 
@@ -41,10 +42,18 @@ export default function App() {
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
 
   useEffect(() => {
-    void fetch("/api/auth/session")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((value: Session) => setSession(value))
-      .catch(() => setSession(null));
+    void Promise.all([
+      fetch("/health").then((response) => (response.ok ? response.json() : { maintenance: false })),
+      fetch("/api/auth/session").then((response) => (response.ok ? response.json() : null)),
+    ])
+      .then(([health, value]) => {
+        setMaintenance(Boolean((health as { maintenance?: boolean }).maintenance));
+        setSession(value as Session);
+      })
+      .catch(() => {
+        setMaintenance(false);
+        setSession(null);
+      });
   }, []);
 
   useEffect(() => {
@@ -52,8 +61,12 @@ export default function App() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  if (session === undefined) {
+  if (session === undefined || maintenance === undefined) {
     return <main className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">{(AUTH_GATE_LABELS[CHATKIT_LOCALE] ?? AUTH_GATE_LABELS.en).loading}</main>;
+  }
+
+  if (maintenance) {
+    return <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6 text-center text-slate-700"><p className="max-w-md text-lg">{(AUTH_GATE_LABELS[CHATKIT_LOCALE] ?? AUTH_GATE_LABELS.en).maintenance}</p></main>;
   }
 
   if (!session?.user) {

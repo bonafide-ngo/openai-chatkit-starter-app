@@ -32,6 +32,7 @@ const envBool = (name, defaultValue) => process.env[name] === undefined
     : process.env[name].toLowerCase() === "true";
 const emailLinkEnabled = envBool("AUTH_EMAIL_LINK", true);
 const localEmailEnabled = envBool("AUTH_EMAIL_LOCAL", true);
+const maintenanceMode = envBool("CHATKIT_MAINTENANCE", false);
 const signOutTranslations = {
     en: ["Signout", "Are you sure you want to sign out?", "Sign out"],
     de: ["Abmelden", "Möchten Sie sich wirklich abmelden?", "Abmelden"],
@@ -178,6 +179,11 @@ const authOptions = {
 
 const server = createServer(async (request, response) => {
     if (!request.url?.startsWith("/api/auth")) { response.writeHead(404); response.end(); return; }
+    if (maintenanceMode && request.url !== "/api/auth/session") {
+        response.writeHead(503, { "content-type": "text/html; charset=utf-8" });
+        response.end("<!doctype html><html><body><h1>System temporarily unavailable for maintenance.</h1></body></html>");
+        return;
+    }
     if (request.method === "GET" && request.url === "/api/auth/signin" && providers.length === 0) {
         const text = noAuthMethodTranslations[requestLocale(request)] || noAuthMethodTranslations.en;
         response.writeHead(503, { "content-type": "text/html; charset=utf-8" });

@@ -33,6 +33,7 @@ from openai import AsyncOpenAI
 
 app = FastAPI(title="ChatKit Starter API")
 APP_TITLE = os.getenv("CHATKIT_APP_TITLE", "ChatKit")
+MAINTENANCE_MODE = os.getenv("CHATKIT_MAINTENANCE", "false").strip().lower() == "true"
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +69,8 @@ temporary_chatkit_server = StarterChatServer(
 async def require_authentication(request: Request, call_next):
     if request.url.path in {"/health", "/docs", "/openapi.json", "/redoc"} or request.method == "OPTIONS":
         return await call_next(request)
+    if MAINTENANCE_MODE:
+        return JSONResponse({"detail": "The system is temporarily unavailable for maintenance."}, status_code=503)
     auth_url = os.getenv("AUTH_INTERNAL_URL", "http://127.0.0.1:3001/api/auth/session")
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
@@ -83,8 +86,8 @@ async def require_authentication(request: Request, call_next):
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, bool | str]:
+    return {"status": "ok", "maintenance": MAINTENANCE_MODE}
 
 
 def vector_store_client() -> AsyncOpenAI:
