@@ -210,15 +210,23 @@ export default function App() {
             {theme === "dark" ? `☀ ${UI_LABELS.light}` : `🌙 ${UI_LABELS.dark}`}
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = "/api/auth/signout";
-            }}
-            className="rounded-lg border border-amber-400 bg-amber-400 px-3 py-1.5 text-sm font-medium text-amber-950 shadow-sm transition hover:border-amber-500 hover:bg-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400"
-          >
-            {SIGN_OUT_LABELS[CHATKIT_LOCALE] ?? SIGN_OUT_LABELS.en}
-          </button>
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+              <span className="max-w-52 truncate align-middle">{session.user?.email ?? "Account"}</span>
+              <span aria-hidden="true" className="ml-2">⌄</span>
+            </summary>
+            <div className="absolute right-0 z-10 mt-2 min-w-full rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/api/auth/signout";
+                }}
+                className="w-full whitespace-nowrap rounded-md bg-amber-400 px-3 py-2 text-left text-sm font-medium text-amber-950 transition hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400"
+              >
+                {SIGN_OUT_LABELS[CHATKIT_LOCALE] ?? SIGN_OUT_LABELS.en}
+              </button>
+            </div>
+          </details>
         </div>
       </header>
 
