@@ -61,6 +61,20 @@ const signInTranslations = {
     zh: { disposableLink: "使用一次性链接登录", localEmail: "使用凭据登录", localEmailField: "电子邮件", oauth: "使用以下方式登录" },
 };
 const supportedAuthLocales = new Set(Object.keys(signInTranslations));
+const noAuthMethodTranslations = {
+    en: { title: "Sign-in unavailable", message: "No authentication method is currently available. Please contact an administrator." },
+    de: { title: "Anmeldung nicht verfügbar", message: "Derzeit ist keine Authentifizierungsmethode verfügbar. Bitte wenden Sie sich an einen Administrator." },
+    es: { title: "Inicio de sesión no disponible", message: "No hay ningún método de autenticación disponible. Contacta con un administrador." },
+    fr: { title: "Connexion indisponible", message: "Aucune méthode d'authentification n'est disponible. Contactez un administrateur." },
+    it: { title: "Accesso non disponibile", message: "Nessun metodo di autenticazione è attualmente disponibile. Contatta un amministratore." },
+    ja: { title: "サインインを利用できません", message: "現在利用できる認証方法がありません。管理者にお問い合わせください。" },
+    ko: { title: "로그인할 수 없음", message: "현재 사용할 수 있는 인증 방법이 없습니다. 관리자에게 문의하세요." },
+    nl: { title: "Inloggen niet beschikbaar", message: "Er is momenteel geen authenticatiemethode beschikbaar. Neem contact op met een beheerder." },
+    pl: { title: "Logowanie niedostępne", message: "Obecnie nie ma dostępnej metody uwierzytelniania. Skontaktuj się z administratorem." },
+    pt: { title: "Login indisponível", message: "Nenhum método de autenticação está disponível no momento. Entre em contato com um administrador." },
+    ru: { title: "Вход недоступен", message: "В настоящее время нет доступного способа аутентификации. Обратитесь к администратору." },
+    zh: { title: "无法登录", message: "当前没有可用的身份验证方式。请联系管理员。" },
+};
 
 function requestLocale(request) {
     const cookieLocale = request.headers.cookie?.match(/(?:^|;\s*)chatkit-language=([^;]+)/)?.[1];
@@ -164,6 +178,12 @@ const authOptions = {
 
 const server = createServer(async (request, response) => {
     if (!request.url?.startsWith("/api/auth")) { response.writeHead(404); response.end(); return; }
+    if (request.method === "GET" && request.url === "/api/auth/signin" && providers.length === 0) {
+        const text = noAuthMethodTranslations[requestLocale(request)] || noAuthMethodTranslations.en;
+        response.writeHead(503, { "content-type": "text/html; charset=utf-8" });
+        response.end(`<!doctype html><html lang="${requestLocale(request)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${text.title}</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f1f5f9;color:#0f172a;font:16px system-ui,sans-serif}.card{width:min(90vw,460px);padding:40px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 20px 45px #0f172a1a;text-align:center}h1{margin:0 0 12px;font-size:25px}p{margin:0;color:#475569;line-height:1.6}</style></head><body><main class="card"><h1>${text.title}</h1><p>${text.message}</p></main></body></html>`);
+        return;
+    }
     if (request.url === "/api/auth/session") {
         const cookies = Object.fromEntries((request.headers.cookie || "").split(";").filter(Boolean).map((part) => {
             const separator = part.indexOf("=");
