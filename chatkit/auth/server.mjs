@@ -10,19 +10,28 @@ import MicrosoftEntraID from "@auth/core/providers/microsoft-entra-id";
 import Apple from "@auth/core/providers/apple";
 import Email from "@auth/core/providers/email";
 import Credentials from "@auth/core/providers/credentials";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const configPath = process.env.AUTH_CONFIG_FILE || path.join(root, "auth.config.json");
+const configPath = process.env.AUTH_CONFIG_FILE || path.join(root, "auth.config.local.json");
 if (!existsSync(configPath)) throw new Error(`Create ${configPath} from auth.config.example.json before starting auth.`);
 const config = JSON.parse(readFileSync(configPath, "utf8"));
 const allowedEmails = new Set((config.allowedEmails || []).map((email) => email.toLowerCase().trim()));
 const localUsers = new Map((config.localUsers || []).map((user) => [user.email.toLowerCase(), user]));
+const authUsers = new Map([...localUsers.values()].map((user) => {
+    const email = user.email.toLowerCase();
+    return [email, { id: email, email, name: email }];
+}));
 const verificationTokens = new Map();
 const secret = process.env.AUTH_SECRET;
 if (!secret || secret.length < 32) throw new Error("AUTH_SECRET must be at least 32 characters.");
 const publicUrl = process.env.AUTH_PUBLIC_URL || "http://localhost:3000";
 const hasEnv = (...names) => names.every((name) => Boolean(process.env[name]?.trim()));
+const envBool = (name, defaultValue) => process.env[name] === undefined
+    ? defaultValue
+    : process.env[name].toLowerCase() === "true";
+const emailLinkEnabled = envBool("AUTH_EMAIL_LINK", true);
+const localEmailEnabled = envBool("AUTH_EMAIL_LOCAL", true);
 const signOutTranslations = {
     en: ["Signout", "Are you sure you want to sign out?", "Sign out"],
     de: ["Abmelden", "Möchten Sie sich wirklich abmelden?", "Abmelden"],
@@ -38,18 +47,18 @@ const signOutTranslations = {
     zh: ["退出登录", "确定要退出登录吗？", "退出登录"],
 };
 const signInTranslations = {
-    en: { with: "Sign in with", email: "Email", credentials: "Username / password" },
-    de: { with: "Anmelden mit", email: "E-Mail", credentials: "Benutzername / Passwort" },
-    es: { with: "Iniciar sesión con", email: "Correo electrónico", credentials: "Usuario / contraseña" },
-    fr: { with: "Se connecter avec", email: "E-mail", credentials: "Nom d'utilisateur / mot de passe" },
-    it: { with: "Accedi con", email: "Email", credentials: "Nome utente / password" },
-    ja: { with: "次でサインイン", email: "メールアドレス", credentials: "ユーザー名 / パスワード" },
-    ko: { with: "다음으로 로그인", email: "이메일", credentials: "사용자 이름 / 비밀번호" },
-    nl: { with: "Inloggen met", email: "E-mail", credentials: "Gebruikersnaam / wachtwoord" },
-    pl: { with: "Zaloguj się przez", email: "E-mail", credentials: "Nazwa użytkownika / hasło" },
-    pt: { with: "Entrar com", email: "E-mail", credentials: "Nome de usuário / senha" },
-    ru: { with: "Войти через", email: "Электронная почта", credentials: "Имя пользователя / пароль" },
-    zh: { with: "使用以下方式登录", email: "电子邮件", credentials: "用户名 / 密码" },
+    en: { disposableLink: "Sign in with disposable link", localEmail: "Sign in with credentials", localEmailField: "Email", oauth: "Sign in with" },
+    de: { disposableLink: "Mit einem Einmal-Link anmelden", localEmail: "Mit Zugangsdaten anmelden", localEmailField: "E-Mail", oauth: "Anmelden mit" },
+    es: { disposableLink: "Iniciar sesión con un enlace de un solo uso", localEmail: "Iniciar sesión con credenciales", localEmailField: "Correo electrónico", oauth: "Iniciar sesión con" },
+    fr: { disposableLink: "Se connecter avec un lien à usage unique", localEmail: "Se connecter avec des identifiants", localEmailField: "E-mail", oauth: "Se connecter avec" },
+    it: { disposableLink: "Accedi con un link temporaneo", localEmail: "Accedi con le credenziali", localEmailField: "Email", oauth: "Accedi con" },
+    ja: { disposableLink: "使い捨てリンクでサインイン", localEmail: "認証情報でサインイン", localEmailField: "メールアドレス", oauth: "次でサインイン" },
+    ko: { disposableLink: "일회용 링크로 로그인", localEmail: "자격 증명으로 로그인", localEmailField: "이메일", oauth: "다음으로 로그인" },
+    nl: { disposableLink: "Inloggen met een eenmalige link", localEmail: "Inloggen met inloggegevens", localEmailField: "E-mail", oauth: "Inloggen met" },
+    pl: { disposableLink: "Zaloguj się przez jednorazowy link", localEmail: "Zaloguj się przy użyciu danych logowania", localEmailField: "E-mail", oauth: "Zaloguj się przez" },
+    pt: { disposableLink: "Entrar com um link descartável", localEmail: "Entrar com credenciais", localEmailField: "E-mail", oauth: "Entrar com" },
+    ru: { disposableLink: "Войти по одноразовой ссылке", localEmail: "Войти с учетными данными", localEmailField: "Электронная почта", oauth: "Войти через" },
+    zh: { disposableLink: "使用一次性链接登录", localEmail: "使用凭据登录", localEmailField: "电子邮件", oauth: "使用以下方式登录" },
 };
 const supportedAuthLocales = new Set(Object.keys(signInTranslations));
 
@@ -101,27 +110,43 @@ const providers = [
     ...(hasEnv("AUTH_APPLE_ID", "AUTH_APPLE_SECRET")
         ? [Apple({ clientId: process.env.AUTH_APPLE_ID, clientSecret: process.env.AUTH_APPLE_SECRET })]
         : []),
-    ...(hasEnv("AUTH_EMAIL_SERVER", "AUTH_EMAIL_FROM")
-        ? [Email({ server: emailServer, from: process.env.AUTH_EMAIL_FROM })]
+    ...(emailLinkEnabled && hasEnv("AUTH_EMAIL_SERVER", "AUTH_EMAIL_FROM")
+        ? [Email({ name: "Disposable link", server: emailServer, from: process.env.AUTH_EMAIL_FROM })]
         : []),
-    Credentials({
-        name: "Username / password",
-        credentials: { email: { label: "Email", type: "email" }, password: { label: "Password", type: "password" } },
-        async authorize(credentials) {
-            const email = String(credentials?.email || "").toLowerCase().trim();
-            const user = localUsers.get(email);
-            if (!user || !allowedEmails.has(email) || !verifyPassword(String(credentials?.password || ""), user.passwordHash)) return null;
-            return { id: email, email, name: email };
-        },
-    }),
+    ...(localEmailEnabled && localUsers.size > 0
+        ? [Credentials({
+            name: "Email",
+            credentials: { email: { label: "Email", type: "email", placeholder: "email@example.com" }, password: { label: "Password", type: "password" } },
+            async authorize(credentials) {
+                const email = String(credentials?.email || "").toLowerCase().trim();
+                const user = localUsers.get(email);
+                if (!user || !allowedEmails.has(email) || !verifyPassword(String(credentials?.password || ""), user.passwordHash)) return null;
+                return { id: email, email, name: email };
+            },
+        })]
+        : []),
 ];
 
 const authOptions = {
     trustHost: true, basePath: "/api/auth", secret, providers, session: { strategy: "jwt" },
     adapter: {
+        async createUser(user) {
+            const email = user.email.toLowerCase();
+            const authUser = { ...user, id: user.id || randomUUID(), email };
+            authUsers.set(email, authUser);
+            return authUser;
+        },
+        async getUser(id) {
+            return [...authUsers.values()].find((user) => user.id === id) || null;
+        },
         async getUserByEmail(email) {
-            const user = localUsers.get(email.toLowerCase());
-            return user ? { id: email.toLowerCase(), email: email.toLowerCase(), name: email.toLowerCase() } : null;
+            return authUsers.get(email.toLowerCase()) || null;
+        },
+        async updateUser(user) {
+            const existing = [...authUsers.values()].find((entry) => entry.id === user.id);
+            const updated = { ...existing, ...user, email: (user.email || existing?.email || "").toLowerCase() };
+            authUsers.set(updated.email, updated);
+            return updated;
         },
         async createVerificationToken(token) {
             verificationTokens.set(`${token.identifier}:${token.token}`, token);
@@ -170,15 +195,16 @@ const server = createServer(async (request, response) => {
     if (request.method === "GET" && request.url === "/api/auth/signin") {
         const translations = signInTranslations[requestLocale(request)] || signInTranslations.en;
         responseBody = responseBody
-            .replaceAll("Sign in with Email", `${translations.with} ${translations.email}`)
-            .replaceAll("Sign in with Username / password", `${translations.with} ${translations.credentials}`)
-            .replaceAll("Sign in with Google", `${translations.with} Google`)
-            .replaceAll("Sign in with Microsoft Entra ID", `${translations.with} Microsoft Entra ID`)
-            .replaceAll("Sign in with GitHub", `${translations.with} GitHub`)
-            .replaceAll("Sign in with Apple", `${translations.with} Apple`)
-            .replaceAll(">Email<", `>${translations.email}<`);
+            .replace(/(<form action="[^"]*\/signin\/email"[\s\S]*?<button[^>]*>)[\s\S]*?(<\/button>)/, `$1${translations.disposableLink}$2`)
+            .replace(/(<form action="[^"]*\/callback\/credentials"[\s\S]*?<button[^>]*>)[\s\S]*?(<\/button>)/, `$1${translations.localEmail}$2`)
+            .replaceAll("Sign in with Google", `${translations.oauth} Google`)
+            .replaceAll("Sign in with Microsoft Entra ID", `${translations.oauth} Microsoft Entra ID`)
+            .replaceAll("Sign in with GitHub", `${translations.oauth} GitHub`)
+            .replaceAll("Sign in with Apple", `${translations.oauth} Apple`)
+            .replaceAll(">Email<", `>${translations.localEmailField}<`);
     }
     response.writeHead(result.status, Object.fromEntries(result.headers));
     response.end(responseBody);
 });
-server.listen(Number(process.env.AUTH_PORT || 3001), "127.0.0.1", () => console.log("Auth.js listening on http://127.0.0.1:3001"));
+const authPort = Number(process.env.AUTH_PORT || 3001);
+server.listen(authPort, "127.0.0.1", () => console.log(`Auth.js listening on http://127.0.0.1:${authPort}`));

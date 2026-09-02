@@ -24,14 +24,21 @@ source .venv/bin/activate
 echo "Installing backend deps (editable) ..."
 python -m pip install -e . >/dev/null
 
-# Load env vars from the repo's .env.local (if present). This includes the
-# optional vector-store configuration as well as the API key.
+# Load app vars from .env.local and auth vars from .env.auth.local.
 ENV_FILE="$PROJECT_ROOT/../.env.local"
 if [ -f "$ENV_FILE" ]; then
   echo "Sourcing backend configuration from $ENV_FILE"
   # shellcheck disable=SC1090
   set -a
   . "$ENV_FILE"
+  set +a
+fi
+
+AUTH_ENV_FILE="$PROJECT_ROOT/../.env.auth.local"
+if [ -f "$AUTH_ENV_FILE" ]; then
+  echo "Sourcing authentication configuration from $AUTH_ENV_FILE"
+  set -a
+  . "$AUTH_ENV_FILE"
   set +a
 fi
 

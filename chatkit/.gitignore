@@ -1,4 +1,6 @@
 node_modules/
-.env*
+.env.local
 !.env.example
-auth/auth.config.json
+.env.auth.local
+!.env.auth.example
+auth/auth.config.local.json

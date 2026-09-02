@@ -22,7 +22,7 @@ Set `OPENAI_API_KEY` before starting the app, or place it in
 ### Authentication
 
 Authentication runs in the server-only Auth.js service on port `3001`. Copy
-`auth/auth.config.example.json` to `auth/auth.config.json` and replace the
+`auth/auth.config.example.json` to `auth/auth.config.local.json` and replace the
 allowlist with the emails that may sign in. This file is ignored by Git and is
 never loaded by Vite. OAuth credentials and `AUTH_SECRET` belong in `.env.local`.
 
@@ -40,6 +40,17 @@ Set `AUTH_EMAIL_SERVER` to the SMTP hostname and `AUTH_EMAIL_PORT` to its port,
 with `AUTH_EMAIL_SECURE=true` for TLS. Optional `AUTH_EMAIL_USERNAME` and
 `AUTH_EMAIL_PASSWORD` configure SMTP authentication. A complete SMTP URL is
 also accepted in `AUTH_EMAIL_SERVER` for compatibility.
+
+Set `AUTH_EMAIL_LINK=false` to hide email magic-link login, or
+`AUTH_EMAIL_LOCAL=false` to hide local email/password login. Both default to
+`true`; local email/password login is shown only when `localUsers` is non-empty.
+
+Auth.js settings are kept separately from the application settings. Copy
+`.env.auth.example` to `.env.auth.local` and put all `AUTH_*` values there. The Auth.js
+launcher watches `.env.auth.local` and `auth/auth.config.local.json`, restarting
+Auth.js automatically when either changes. `.env.auth.local` is ignored by Git.
+Existing `.env.local` auth values are
+used only as a migration fallback until `.env.auth.local` contains an `AUTH_*` value.
 
 To create a password hash for `localUsers`, run:
 

@@ -5,13 +5,14 @@
     "dev": "concurrently --kill-others-on-fail --names auth,backend,frontend \"npm run auth\" \"npm run backend\" \"npm run frontend-dev\"",
     "frontend-dev": "npm --prefix frontend install && bash ./backend/scripts/wait-for-backend.sh && npm --prefix frontend run dev",
     "build": "npm run frontend-build",
-    "auth": "set -a; [ ! -f .env.local ] || . ./.env.local; set +a; node auth/server.mjs",
+    "auth": "node auth/start.mjs",
     "frontend-build": "npm --prefix frontend install && npm --prefix frontend run build",
     "backend": "./backend/scripts/run.sh"
   },
   "devDependencies": {
     "@auth/core": "^0.40.0",
     "concurrently": "^9.1.2",
+    "dotenv": "^16.4.7",
     "nodemailer": "^6.8.0"
   }
 }
