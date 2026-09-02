@@ -6,6 +6,18 @@ interpreter sessions, and file analysis.
 
 ## Quick Start
 
+From the `chatkit` directory, create the local configuration files:
+
+```bash
+cp .env.example .env.local
+cp .env.auth.example .env.auth.local
+cp auth/auth.config.example.json auth/auth.config.local.json
+```
+
+Set `OPENAI_API_KEY` in `.env.local` and set `AUTH_SECRET` to a random value
+of at least 32 characters in `.env.auth.local`. Configure at least one
+authentication method before signing in.
+
 ```bash
 npm install
 npm run dev
@@ -24,7 +36,8 @@ Set `OPENAI_API_KEY` before starting the app, or place it in
 Authentication runs in the server-only Auth.js service on port `3001`. Copy
 `auth/auth.config.example.json` to `auth/auth.config.local.json` and replace the
 allowlist with the emails that may sign in. This file is ignored by Git and is
-never loaded by Vite. OAuth credentials and `AUTH_SECRET` belong in `.env.local`.
+never loaded by Vite. OAuth credentials and `AUTH_SECRET` belong in
+`.env.auth.local`.
 
 Add local email/password accounts under `localUsers`; each entry contains only
 `email` and `passwordHash`.
@@ -35,8 +48,8 @@ internal Auth.js listening port.
 
 Auth.js exposes Google, Microsoft Entra ID, GitHub, Apple, email magic links,
 and email/password credentials. Configure the OAuth callback URLs as
-`http://localhost:3000/api/auth/callback/<provider>` in development. Magic
-Set `AUTH_EMAIL_SERVER` to the SMTP hostname and `AUTH_EMAIL_PORT` to its port,
+`http://localhost:3000/api/auth/callback/<provider>` in development. For magic
+links, set `AUTH_EMAIL_SERVER` to the SMTP hostname and `AUTH_EMAIL_PORT` to its port,
 with `AUTH_EMAIL_SECURE=true` for TLS. Optional `AUTH_EMAIL_USERNAME` and
 `AUTH_EMAIL_PASSWORD` configure SMTP authentication. A complete SMTP URL is
 also accepted in `AUTH_EMAIL_SERVER` for compatibility.
@@ -82,7 +95,7 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | `OPENAI_VECTOR_STORE_IDS` | none | Comma-separated OpenAI vector store IDs used by the assistant for file search. |
 | `CHATKIT_APP_TITLE` | `ChatKit` | Application title shown in exported documents. |
 | `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
-| `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_localhost_dev` | ChatKit domain key. |
+| `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_local_dev` | ChatKit domain key. |
 | `CHATKIT_STORE_PATH` | `.data/chatkit-store.json` | File-store location relative to `backend/`. |
 | `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
 | `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
@@ -189,4 +202,5 @@ of the temporary session.
 
 - Update UI and connection settings in `frontend/src/lib/config.ts`.
 - Adjust layout in `frontend/src/components/ChatKitPanel.tsx`.
-- Swap the in-memory store in `backend/app/server.py` for persistence.
+- Replace the JSON-backed store in `backend/app/memory_store.py` with a production
+	database-backed store for multi-process or production deployments.

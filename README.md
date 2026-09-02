@@ -17,15 +17,32 @@ responses, web search, code execution, and file analysis.
 
 ## Run It
 
+From a fresh checkout, create the local configuration files:
+
 ```bash
 cd chatkit
+cp .env.example .env.local
+cp .env.auth.example .env.auth.local
+cp auth/auth.config.example.json auth/auth.config.local.json
+```
+
+Set `OPENAI_API_KEY` in `.env.local` and set `AUTH_SECRET` to a random value
+of at least 32 characters in `.env.auth.local`. Configure at least one
+authentication method in the auth environment or add an allowed local user to
+`auth/auth.config.local.json`; the detailed options are in the
+[ChatKit guide](chatkit/README.md).
+
+Then install dependencies and start the application:
+
+```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The command starts both
-services. The frontend waits for the backend before starting, so the first
-ChatKit request does not race backend startup.
+Open [http://localhost:3000](http://localhost:3000). The command starts three
+services: Auth.js on port `3001`, the FastAPI backend on port `8000`, and the
+Vite frontend on port `3000`. The frontend waits for the backend before
+starting, so the first ChatKit request does not race backend startup.
 
 See the [ChatKit guide](chatkit/README.md) for configuration, storage, file
 uploads, and deployment notes.
