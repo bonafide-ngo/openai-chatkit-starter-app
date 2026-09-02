@@ -18,7 +18,7 @@ import {
 
 type Theme = "light" | "dark";
 type ChatMode = "persistent" | "temporary";
-type Session = { user?: { name?: string | null; email?: string | null } } | null;
+type Session = { user?: { id?: string; name?: string | null; email?: string | null } } | null;
 
 export default function App() {
   const [session, setSession] = useState<Session | undefined>(undefined);
@@ -36,7 +36,7 @@ export default function App() {
   });
   const [chatMode, setChatMode] = useState<ChatMode>("persistent");
   const [persistentThreadId, setPersistentThreadId] = useState<string | null>(
-    () => localStorage.getItem("chatkit-persistent-thread"),
+    null,
   );
   const [temporaryThreadId, setTemporaryThreadId] = useState<string | null>(null);
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
@@ -49,6 +49,10 @@ export default function App() {
       .then(([health, value]) => {
         setMaintenance(Boolean((health as { maintenance?: boolean }).maintenance));
         setSession(value as Session);
+        const userId = (value as Session)?.user?.email?.trim().toLowerCase();
+        setPersistentThreadId(
+          userId ? localStorage.getItem(`chatkit-persistent-thread:${userId}`) : null,
+        );
       })
       .catch(() => {
         setMaintenance(false);
@@ -96,24 +100,34 @@ export default function App() {
       return;
     }
 
-    localStorage.removeItem("chatkit-persistent-thread");
+    const userKey = session.user?.email?.trim().toLowerCase();
+    if (userKey) {
+      localStorage.removeItem(`chatkit-persistent-thread:${userKey}`);
+    }
     window.location.reload();
   };
 
   const handleThreadChange = (threadId: string | null) => {
     if (chatMode === "persistent") {
       setPersistentThreadId(threadId);
+      const userKey = session.user?.email?.trim().toLowerCase();
+      const storageKey = userKey
+        ? `chatkit-persistent-thread:${userKey}`
+        : null;
       if (threadId) {
-        localStorage.setItem("chatkit-persistent-thread", threadId);
-      } else {
-        localStorage.removeItem("chatkit-persistent-thread");
+        if (storageKey) localStorage.setItem(storageKey, threadId);
+      } else if (storageKey) {
+        localStorage.removeItem(storageKey);
       }
     }
   };
 
   const handlePersistentChatkitError = () => {
     window.alert(MISSING_THREAD_MESSAGES[CHATKIT_LOCALE] ?? MISSING_THREAD_MESSAGES.en);
-    localStorage.removeItem("chatkit-persistent-thread");
+    const userKey = session.user?.email?.trim().toLowerCase();
+    if (userKey) {
+      localStorage.removeItem(`chatkit-persistent-thread:${userKey}`);
+    }
     setPersistentThreadId(null);
   };
 

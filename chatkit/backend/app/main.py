@@ -19,7 +19,7 @@ import httpx
 from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
 from .memory_store import EphemeralStore
 from .export import build_docx, build_markdown, build_pdf, conversation_rows, export_text
-from .server import GENERATED_FILES, StarterChatServer, delete_all_generated_files
+from .server import GENERATED_FILES, StarterChatServer
 from .vector_store import (
     configured_vector_store_ids,
     delete_vector_store_file,
@@ -80,8 +80,12 @@ async def require_authentication(request: Request, call_next):
             })
     except httpx.HTTPError:
         return JSONResponse({"detail": "Authentication service unavailable"}, status_code=503)
-    if auth_response.status_code != 200 or not auth_response.json().get("user"):
+    auth_payload = auth_response.json()
+    user = auth_payload.get("user")
+    email = user.get("email") if isinstance(user, dict) else None
+    if auth_response.status_code != 200 or not user or not isinstance(email, str) or not email.strip():
         return JSONResponse({"detail": "Authentication required"}, status_code=401)
+    request.state.user_id = email.strip().lower()
     return await call_next(request)
 
 
@@ -101,7 +105,9 @@ async def process_chatkit_request(
     """Proxy the ChatKit web component payload to the server implementation."""
     payload = await request.body()
     try:
-        result = await server.process(payload, {"request": request})
+        result = await server.process(
+            payload, {"request": request, "user_id": request.state.user_id}
+        )
     except NotFoundError:
         try:
             parsed_payload = json.loads(payload)
@@ -111,7 +117,10 @@ async def process_chatkit_request(
         if parsed_payload.get("type") == "threads.get_by_id":
             thread_id = parsed_payload.get("params", {}).get("thread_id")
             if isinstance(thread_id, str):
-                await server.store.delete_thread(thread_id, {"request": request})
+                await server.store.delete_thread(
+                    thread_id,
+                    {"request": request, "user_id": request.state.user_id},
+                )
                 return JSONResponse(
                     {"error": "The requested chat was unavailable and was removed from history."},
                     status_code=404,
@@ -139,13 +148,14 @@ async def temporary_chatkit_endpoint(request: Request) -> Response:
 
 async def export_thread(thread_id: str, extension: str, request: Request, locale: str) -> Response:
     server = temporary_chatkit_server if request.url.path.startswith("/chatkit/temporary") else chatkit_server
-    thread = await server.store.load_thread(thread_id, {"request": request})
+    context = {"request": request, "user_id": request.state.user_id}
+    thread = await server.store.load_thread(thread_id, context)
     items_page = await server.store.load_thread_items(
         thread_id,
         after=None,
         limit=10000,
         order="asc",
-        context={"request": request},
+        context=context,
     )
     labels = export_text(locale)
     title = thread.title or labels["chat_export"]
@@ -184,8 +194,9 @@ async def export_temporary_thread(thread_id: str, extension: str, request: Reque
 
 @app.delete("/chatkit/threads")
 async def delete_all_threads(request: Request) -> Response:
-    await chatkit_server.store.delete_all({"request": request})
-    delete_all_generated_files()
+    await chatkit_server.store.delete_all(
+        {"request": request, "user_id": request.state.user_id}
+    )
     return Response(status_code=204)
 
 

@@ -23,6 +23,7 @@ ATTACHMENT_ADAPTER = TypeAdapter(Attachment)
 class MemoryStore(Store[dict]):
     def __init__(self, cleanup_thread_files=None):
         self.threads: dict[str, ThreadMetadata] = {}
+        self.thread_owners: dict[str, str] = {}
         self.items: dict[str, list[ThreadItem]] = defaultdict(list)
         self.attachments: dict[str, Attachment] = {}
         self.cleanup_thread_files = cleanup_thread_files
@@ -30,7 +31,7 @@ class MemoryStore(Store[dict]):
         self._load()
 
     async def load_thread(self, thread_id: str, context: dict) -> ThreadMetadata:
-        if thread_id not in self.threads:
+        if not self._owns_thread(thread_id, context):
             raise NotFoundError(f"Thread {thread_id} not found")
         return self.threads[thread_id]
 
@@ -38,13 +39,22 @@ class MemoryStore(Store[dict]):
         metadata = ThreadMetadata.model_validate(
             thread.model_dump(exclude={"items"})
         )
+        owner_id = self._owner_id(context)
+        existing_owner = self.thread_owners.get(metadata.id)
+        if existing_owner is not None and existing_owner != owner_id:
+            raise NotFoundError(f"Thread {metadata.id} not found")
         self.threads[metadata.id] = metadata
+        self.thread_owners[metadata.id] = owner_id
         self._persist()
 
     async def load_threads(
         self, limit: int, after: str | None, order: str, context: dict
     ) -> Page[ThreadMetadata]:
-        threads = list(self.threads.values())
+        threads = [
+            thread
+            for thread_id, thread in self.threads.items()
+            if self._owns_thread(thread_id, context)
+        ]
         return self._paginate(
             threads,
             after,
@@ -58,6 +68,7 @@ class MemoryStore(Store[dict]):
     async def load_thread_items(
         self, thread_id: str, after: str | None, limit: int, order: str, context: dict
     ) -> Page[ThreadItem]:
+        self._require_thread(thread_id, context)
         items = self.items.get(thread_id, [])
         return self._paginate(
             items,
@@ -72,6 +83,7 @@ class MemoryStore(Store[dict]):
     async def add_thread_item(
         self, thread_id: str, item: ThreadItem, context: dict
     ) -> None:
+        self._require_thread(thread_id, context)
         self.items[thread_id].append(item)
         self._persist()
 
@@ -80,6 +92,7 @@ class MemoryStore(Store[dict]):
         attachment: Attachment,
         context: dict,
     ) -> None:
+        self._require_thread(attachment.thread_id, context)
         self.attachments[attachment.id] = attachment
         self._persist()
 
@@ -88,22 +101,27 @@ class MemoryStore(Store[dict]):
         attachment_id: str,
         context: dict,
     ) -> Attachment:
-        if attachment_id not in self.attachments:
+        attachment = self.attachments.get(attachment_id)
+        if attachment is None or not self._owns_thread(attachment.thread_id, context):
             raise NotFoundError(
                 f"Attachment {attachment_id} not found"
             )
 
-        return self.attachments[attachment_id]
+        return attachment
 
     async def delete_attachment(
         self,
         attachment_id: str,
         context: dict,
     ) -> None:
+        attachment = self.attachments.get(attachment_id)
+        if attachment is not None and not self._owns_thread(attachment.thread_id, context):
+            raise NotFoundError(f"Attachment {attachment_id} not found")
         self.attachments.pop(attachment_id, None)
         self._persist()
 
     async def save_item(self, thread_id: str, item: ThreadItem, context: dict) -> None:
+        self._require_thread(thread_id, context)
         items = self.items[thread_id]
         for idx, existing in enumerate(items):
             if existing.id == item.id:
@@ -116,13 +134,16 @@ class MemoryStore(Store[dict]):
     async def load_item(
         self, thread_id: str, item_id: str, context: dict
     ) -> ThreadItem:
+        self._require_thread(thread_id, context)
         for item in self.items.get(thread_id, []):
             if item.id == item_id:
                 return item
         raise NotFoundError(f"Item {item_id} not found in thread {thread_id}")
 
     async def delete_thread(self, thread_id: str, context: dict) -> None:
+        self._require_thread(thread_id, context)
         self.threads.pop(thread_id, None)
+        self.thread_owners.pop(thread_id, None)
         self.items.pop(thread_id, None)
 
         attachment_ids = [
@@ -139,22 +160,27 @@ class MemoryStore(Store[dict]):
         self._persist()
 
     async def delete_all(self, context: dict) -> None:
-        for thread_id in list(self.threads):
+        owned_thread_ids = [
+            thread_id for thread_id in self.threads if self._owns_thread(thread_id, context)
+        ]
+        for thread_id in owned_thread_ids:
             if self.cleanup_thread_files is not None:
                 self.cleanup_thread_files(thread_id)
 
-        self.threads.clear()
-        self.items.clear()
-        self.attachments.clear()
-
-        for path in UPLOAD_DIR.iterdir() if UPLOAD_DIR.exists() else []:
-            if path.is_file():
-                path.unlink()
+        for thread_id in owned_thread_ids:
+            self.threads.pop(thread_id, None)
+            self.thread_owners.pop(thread_id, None)
+            self.items.pop(thread_id, None)
+        for attachment_id, attachment in list(self.attachments.items()):
+            if attachment.thread_id in owned_thread_ids:
+                self.attachments.pop(attachment_id, None)
+                (UPLOAD_DIR / attachment_id).unlink(missing_ok=True)
         self._persist()
 
     async def delete_thread_item(
         self, thread_id: str, item_id: str, context: dict
     ) -> None:
+        self._require_thread(thread_id, context)
         self.items[thread_id] = [
             item for item in self.items.get(thread_id, []) if item.id != item_id
         ]
@@ -169,6 +195,11 @@ class MemoryStore(Store[dict]):
             self.threads = {
                 thread_id: ThreadMetadata.model_validate(thread)
                 for thread_id, thread in data.get("threads", {}).items()
+            }
+            self.thread_owners = {
+                thread_id: owner_id
+                for thread_id, owner_id in data.get("thread_owners", {}).items()
+                if thread_id in self.threads and isinstance(owner_id, str)
             }
             self.items = defaultdict(
                 list,
@@ -192,6 +223,7 @@ class MemoryStore(Store[dict]):
                 thread_id: thread.model_dump(mode="json")
                 for thread_id, thread in self.threads.items()
             },
+            "thread_owners": self.thread_owners,
             "items": {
                 thread_id: [item.model_dump(mode="json") for item in items]
                 for thread_id, items in self.items.items()
@@ -213,6 +245,23 @@ class MemoryStore(Store[dict]):
         temporary_path.chmod(0o600)
         temporary_path.replace(self.path)
         self.path.chmod(0o600)
+
+    @staticmethod
+    def _owner_id(context: dict) -> str:
+        owner_id = context.get("user_id")
+        if not isinstance(owner_id, str) or not owner_id:
+            raise NotFoundError("Authenticated user not found")
+        return owner_id.strip().lower()
+
+    def _owns_thread(self, thread_id: str, context: dict) -> bool:
+        return (
+            thread_id in self.threads
+            and self.thread_owners.get(thread_id) == self._owner_id(context)
+        )
+
+    def _require_thread(self, thread_id: str, context: dict) -> None:
+        if not self._owns_thread(thread_id, context):
+            raise NotFoundError(f"Thread {thread_id} not found")
 
     def _paginate(
         self,
