@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import type { Attachment } from "@openai/chatkit";
 import { ChatKitPanel } from "./components/ChatKitPanel";
 import { KnowledgeBasePanel } from "./components/KnowledgeBasePanel";
 import {
@@ -8,6 +7,10 @@ import {
   CHATKIT_TEMPORARY_API_URL,
   CHATKIT_LOCALE,
   EXPORT_UI_LABELS,
+  LANGUAGE_NAMES,
+  MISSING_THREAD_MESSAGES,
+  SUPPORTED_APP_LOCALES,
+  setChatkitLocale,
   UI_LABELS,
 } from "./lib/config";
 
@@ -32,7 +35,6 @@ export default function App() {
   );
   const [temporaryThreadId, setTemporaryThreadId] = useState<string | null>(null);
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
-  const [localAttachment, setLocalAttachment] = useState<Attachment | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.colorScheme = theme;
@@ -70,12 +72,9 @@ export default function App() {
   };
 
   const handlePersistentChatkitError = () => {
-    if (!persistentThreadId) {
-      return;
-    }
-
+    window.alert(MISSING_THREAD_MESSAGES[CHATKIT_LOCALE] ?? MISSING_THREAD_MESSAGES.en);
     localStorage.removeItem("chatkit-persistent-thread");
-    window.location.reload();
+    setPersistentThreadId(null);
   };
 
   const activeThreadId = chatMode === "persistent" ? persistentThreadId : temporaryThreadId;
@@ -95,21 +94,6 @@ export default function App() {
     link.download = `chat-${activeThreadId}.${format}`;
     link.click();
     URL.revokeObjectURL(url);
-  };
-
-  const useFileLocally = async (file: File): Promise<Attachment> => {
-    const response = await fetch(`${CHATKIT_API_URL}/local-uploads`, {
-      method: "POST",
-      headers: {
-        "content-type": file.type || "application/octet-stream",
-        "x-filename": file.name,
-      },
-      body: file,
-    });
-    if (!response.ok) throw new Error(UI_LABELS.unableToUploadLocalFile);
-    const attachment = await response.json() as Attachment;
-    setLocalAttachment(attachment);
-    return attachment;
   };
 
   return (
@@ -143,6 +127,22 @@ export default function App() {
           >
             {UI_LABELS.files}
           </button>
+
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <select
+              value={CHATKIT_LOCALE}
+              onChange={(event) => {
+                setChatkitLocale(event.target.value as typeof CHATKIT_LOCALE);
+                window.location.reload();
+              }}
+              aria-label="Language"
+              className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+            >
+              {SUPPORTED_APP_LOCALES.map((locale) => (
+                <option key={locale} value={locale}>{LANGUAGE_NAMES[locale]}</option>
+              ))}
+            </select>
+          </label>
 
           <select
             defaultValue=""
@@ -181,8 +181,6 @@ export default function App() {
           onThreadChange={handleThreadChange}
           onChatkitError={handlePersistentChatkitError}
           onDeleteAll={deleteAllHistory}
-          localAttachment={localAttachment}
-          onLocalAttachmentConsumed={() => setLocalAttachment(null)}
         />
         <ChatKitPanel
           theme={theme}
@@ -191,13 +189,10 @@ export default function App() {
           initialThread={null}
           onThreadChange={setTemporaryThreadId}
           onDeleteAll={deleteAllHistory}
-          localAttachment={localAttachment}
-          onLocalAttachmentConsumed={() => setLocalAttachment(null)}
         />
         <KnowledgeBasePanel
           open={knowledgeBaseOpen}
           onClose={() => setKnowledgeBaseOpen(false)}
-          onUseLocally={useFileLocally}
         />
       </div>
     </main >

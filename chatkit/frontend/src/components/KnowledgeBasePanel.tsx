@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { KNOWLEDGE_BASE_URL, UI_LABELS } from "../lib/config";
+import { getFileStatusLabel, KNOWLEDGE_BASE_URL, UI_LABELS } from "../lib/config";
 
 type VectorStore = { id: string; name: string };
 type KnowledgeFile = {
@@ -9,19 +9,16 @@ type KnowledgeFile = {
     created_at: number;
     bytes: number | null;
 };
-type Attachment = { type: "file" | "image"; id: string; name: string; mime_type: string; preview_url?: string };
-
 interface KnowledgeBasePanelProps {
     open: boolean;
     onClose: () => void;
-    onUseLocally: (file: File) => Promise<Attachment>;
 }
 
-export function KnowledgeBasePanel({ open, onClose, onUseLocally }: KnowledgeBasePanelProps) {
+export function KnowledgeBasePanel({ open, onClose }: KnowledgeBasePanelProps) {
     const [stores, setStores] = useState<VectorStore[]>([]);
     const [selectedStore, setSelectedStore] = useState("");
     const [files, setFiles] = useState<KnowledgeFile[]>([]);
-    const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
 
@@ -55,51 +52,56 @@ export function KnowledgeBasePanel({ open, onClose, onUseLocally }: KnowledgeBas
         loadFiles(selectedStore).catch((error: Error) => setMessage(error.message));
     }, [selectedStore]);
 
-    const chooseFile = (file: File | undefined) => {
-        if (file) {
+    const chooseFiles = (selectedFiles: FileList | null) => {
+        if (selectedFiles?.length) {
             setMessage("");
-            setPendingFile(file);
+            setPendingFiles(Array.from(selectedFiles));
         }
     };
 
     const uploadToKnowledgeBase = async () => {
-        if (!pendingFile || !selectedStore) return;
+        if (!pendingFiles.length || !selectedStore) return;
         setBusy(true);
-        setMessage(UI_LABELS.indexingFile);
+        setMessage(`${UI_LABELS.indexingFile} (1/${pendingFiles.length})`);
         try {
-            const body = new FormData();
-            body.append("file", pendingFile);
-            const response = await fetch(`${KNOWLEDGE_BASE_URL}/stores/${encodeURIComponent(selectedStore)}/files`, {
-                method: "POST",
-                body,
-            });
-            if (!response.ok) {
-                const errorBody: unknown = await response.json();
-                const detail = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody
-                    ? String(errorBody.detail)
-                    : UI_LABELS.unableToIndexFile;
-                throw new Error(detail);
+            let replaced = false;
+            for (const [index, file] of pendingFiles.entries()) {
+                setMessage(`${UI_LABELS.indexingFile} (${index + 1}/${pendingFiles.length})`);
+                const body = new FormData();
+                body.append("file", file);
+                const response = await fetch(`${KNOWLEDGE_BASE_URL}/stores/${encodeURIComponent(selectedStore)}/files`, {
+                    method: "POST",
+                    body,
+                });
+                if (!response.ok) {
+                    const errorBody: unknown = await response.json();
+                    const detail = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody
+                        ? String(errorBody.detail)
+                        : UI_LABELS.unableToIndexFile;
+                    throw new Error(detail);
+                }
+                const result = await response.json() as {
+                    id: string;
+                    filename: string;
+                    status: string;
+                    replaced: boolean;
+                };
+                replaced ||= result.replaced;
+                setFiles((currentFiles) => [
+                    {
+                        id: result.id,
+                        filename: result.filename,
+                        status: result.status,
+                        created_at: Math.floor(Date.now() / 1000),
+                        bytes: file.size,
+                    },
+                    ...currentFiles.filter((currentFile) => currentFile.filename !== result.filename),
+                ]);
             }
-            const result = await response.json() as { replaced: boolean };
-            setPendingFile(null);
-            setMessage(result.replaced ? UI_LABELS.fileReplaced : UI_LABELS.fileIndexed);
-            await loadFiles(selectedStore);
+            setPendingFiles([]);
+            setMessage(replaced ? UI_LABELS.fileReplaced : UI_LABELS.fileIndexed);
         } catch (error) {
             setMessage(error instanceof Error ? error.message : UI_LABELS.unableToIndexFile);
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    const handleUseFileLocally = async () => {
-        if (!pendingFile) return;
-        setBusy(true);
-        try {
-            await onUseLocally(pendingFile);
-            setPendingFile(null);
-            setMessage(UI_LABELS.fileAdded);
-        } catch (error) {
-            setMessage(error instanceof Error ? error.message : UI_LABELS.unableToAddFile);
         } finally {
             setBusy(false);
         }
@@ -156,17 +158,18 @@ export function KnowledgeBasePanel({ open, onClose, onUseLocally }: KnowledgeBas
 
                 <label className="cursor-pointer rounded border border-dashed border-slate-400 p-3 text-center text-sm text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
                     {UI_LABELS.chooseFile}
-                    <input type="file" className="sr-only" onChange={(event) => chooseFile(event.target.files?.[0])} disabled={busy} />
+                    <input type="file" multiple className="sr-only" onChange={(event) => chooseFiles(event.target.files)} disabled={busy} />
                 </label>
 
-                {pendingFile && (
+                {pendingFiles.length > 0 && (
                     <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/30">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{pendingFile.name}</p>
-                        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{UI_LABELS.localOrKnowledgeBase}</p>
+                        <ul className="space-y-1 font-medium text-slate-900 dark:text-slate-100">
+                            {pendingFiles.map((file) => <li key={`${file.name}-${file.lastModified}`}>{file.name}</li>)}
+                        </ul>
+                        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{UI_LABELS.uploadToKnowledgeBase}</p>
                         <div className="mt-3 flex gap-2">
-                            <button type="button" onClick={() => void handleUseFileLocally()} disabled={busy} className="rounded bg-slate-900 px-3 py-2 text-xs text-white disabled:opacity-50 dark:bg-white dark:text-slate-900">{UI_LABELS.useLocally}</button>
                             <button type="button" onClick={() => void uploadToKnowledgeBase()} disabled={busy || !selectedStore} className="rounded bg-amber-600 px-3 py-2 text-xs text-white disabled:opacity-50">{UI_LABELS.uploadToKnowledgeBase}</button>
-                            <button type="button" onClick={() => setPendingFile(null)} disabled={busy} className="px-2 text-xs text-slate-500">{UI_LABELS.cancel}</button>
+                            <button type="button" onClick={() => setPendingFiles([])} disabled={busy} className="px-2 text-xs text-slate-500">{UI_LABELS.cancel}</button>
                         </div>
                     </div>
                 )}
@@ -180,7 +183,7 @@ export function KnowledgeBasePanel({ open, onClose, onUseLocally }: KnowledgeBas
                 <ul className="space-y-2">
                     {files.map((file) => (
                         <li key={file.id} className="flex items-center justify-between gap-3 rounded border border-slate-200 p-3 text-sm dark:border-slate-700">
-                            <span className="min-w-0 truncate text-slate-800 dark:text-slate-200" title={file.filename}>{file.filename}<span className="ml-2 text-xs text-slate-500">{file.status}</span></span>
+                            <span className="min-w-0 truncate text-slate-800 dark:text-slate-200" title={file.filename}>{file.filename}<span className="ml-2 text-xs text-slate-500">{getFileStatusLabel(file.status)}</span></span>
                             <button type="button" onClick={() => void deleteFile(file.id)} disabled={busy} className="shrink-0 text-xs text-red-600 disabled:opacity-40">{UI_LABELS.deleteFile}</button>
                         </li>
                     ))}

@@ -54,11 +54,11 @@ is configured, the assistant receives the hosted file-search tool and can use
 the indexed files to answer questions. Leaving the variable empty disables
 vector-store search.
 
-Use the `Files` button in the app to choose a file. The default local option
-sends it to the active conversation only. Choosing the knowledge-base option
-requires selecting one of the configured stores and waits for indexing to
-finish. Uploading another file with the same name to the same store replaces
-and reindexes the previous file after the new version succeeds.
+Use the upload button beside the composer to attach a file to the active
+conversation only. Use the `Files` button to choose a configured vector store
+and upload a file to its knowledge base. The knowledge-base upload waits for
+indexing to finish. Uploading another file with the same name to the same store
+replaces and reindexes the previous file after the new version succeeds.
 
 The file list in the same panel supports deleting individual files or all files
 from the selected store. Deletion removes the vector-store association and then

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 from chatkit.server import StreamingResult
+from chatkit.store import NotFoundError
 from fastapi import File, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -25,7 +27,6 @@ from .vector_store import (
     store_label,
     upload_and_replace,
 )
-from chatkit.types import AttachmentCreateParams
 from openai import AsyncOpenAI
 
 
@@ -72,7 +73,23 @@ async def process_chatkit_request(
 ) -> Response:
     """Proxy the ChatKit web component payload to the server implementation."""
     payload = await request.body()
-    result = await server.process(payload, {"request": request})
+    try:
+        result = await server.process(payload, {"request": request})
+    except NotFoundError:
+        try:
+            parsed_payload = json.loads(payload)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            parsed_payload = {}
+
+        if parsed_payload.get("type") == "threads.get_by_id":
+            thread_id = parsed_payload.get("params", {}).get("thread_id")
+            if isinstance(thread_id, str):
+                await server.store.delete_thread(thread_id, {"request": request})
+                return JSONResponse(
+                    {"error": "The requested chat was unavailable and was removed from history."},
+                    status_code=404,
+                )
+            raise
 
     if isinstance(result, StreamingResult):
         return StreamingResponse(result, media_type="text/event-stream")
@@ -190,23 +207,6 @@ async def delete_all_knowledge_base_files(vector_store_id: str) -> Response:
         await delete_vector_store_file(client, vector_store_id, file["id"])
     return Response(status_code=204)
 
-
-@app.post("/chatkit/local-uploads")
-async def upload_local_file(request: Request) -> dict:
-    filename = request.headers.get("x-filename", "uploaded-file")
-    mime_type = request.headers.get("content-type", "application/octet-stream")
-    content = await request.body()
-    if not content:
-        raise HTTPException(status_code=400, detail="The uploaded file is empty")
-    if len(content) > MAX_ATTACHMENT_BYTES:
-        raise HTTPException(status_code=413, detail="Attachment is too large")
-
-    attachment = await chatkit_server.attachment_store.create_attachment(
-        AttachmentCreateParams(name=filename, mime_type=mime_type),
-        {"request": request},
-    )
-    (UPLOAD_DIR / attachment.id).write_bytes(content)
-    return attachment.model_dump(mode="json")
 
 UPLOAD_DIR = Path("/tmp/chatkit-uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

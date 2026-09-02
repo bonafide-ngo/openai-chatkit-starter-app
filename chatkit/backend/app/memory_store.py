@@ -52,6 +52,7 @@ class MemoryStore(Store[dict]):
             order,
             sort_key=lambda t: t.created_at,
             cursor_key=lambda t: t.id,
+            page_type=Page[ThreadMetadata],
         )
 
     async def load_thread_items(
@@ -65,6 +66,7 @@ class MemoryStore(Store[dict]):
             order,
             sort_key=lambda i: i.created_at,
             cursor_key=lambda i: i.id,
+            page_type=Page[ThreadItem],
         )
 
     async def add_thread_item(
@@ -220,6 +222,7 @@ class MemoryStore(Store[dict]):
         order: str,
         sort_key,
         cursor_key,
+        page_type,
     ):
         sorted_rows = sorted(rows, key=sort_key, reverse=order == "desc")
         start = 0
@@ -231,7 +234,7 @@ class MemoryStore(Store[dict]):
         data = sorted_rows[start : start + limit]
         has_more = start + limit < len(sorted_rows)
         next_after = cursor_key(data[-1]) if has_more and data else None
-        return Page(data=data, has_more=has_more, after=next_after)
+        return page_type(data=data, has_more=has_more, after=next_after)
 
 
 class EphemeralStore(MemoryStore):

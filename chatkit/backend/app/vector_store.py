@@ -40,7 +40,11 @@ async def list_vector_store_files(
     )
     files: list[dict[str, Any]] = []
     for vector_file in response.data:
-        file = await client.files.retrieve(vector_file.id)
+        try:
+            file = await client.files.retrieve(vector_file.id)
+        except NotFoundError:
+            # A deleted account file can remain in the vector-store listing briefly.
+            continue
         files.append(
             {
                 "id": vector_file.id,

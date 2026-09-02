@@ -27,14 +27,72 @@ export const CHATKIT_TEMPORARY_API_URL = CHATKIT_API_URL.replace(
 );
 export const KNOWLEDGE_BASE_URL = `${CHATKIT_API_URL.replace(/\/$/, "")}/knowledge-base`;
 
-const supportedLocales = new Set<SupportedLocale>([
+export const SUPPORTED_APP_LOCALES: SupportedLocale[] = [
   "de", "en", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "zh",
-]);
+];
+
+const supportedLocales = new Set<SupportedLocale>(SUPPORTED_APP_LOCALES);
+
+const readCookie = (name: string): string | undefined =>
+  document.cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
 
 export const CHATKIT_LOCALE: SupportedLocale = (() => {
-  const language = navigator.language.split("-")[0] as SupportedLocale;
+  const savedLanguage = readCookie("chatkit-language");
+  const language = (savedLanguage || navigator.language.split("-")[0]) as SupportedLocale;
   return supportedLocales.has(language) ? language : "en";
 })();
+
+export const setChatkitLocale = (locale: SupportedLocale): void => {
+  document.cookie = `chatkit-language=${encodeURIComponent(locale)}; max-age=31536000; path=/; SameSite=Lax`;
+};
+
+export const LANGUAGE_LABELS: Record<string, string> = {
+  en: "Language", de: "Sprache", es: "Idioma", fr: "Langue", it: "Lingua",
+  ja: "言語", ko: "언어", nl: "Taal", pl: "Język", pt: "Idioma", ru: "Язык", zh: "语言",
+};
+
+export const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", de: "Deutsch", es: "Español", fr: "Français", it: "Italiano",
+  ja: "日本語", ko: "한국어", nl: "Nederlands", pl: "Polski", pt: "Português",
+  ru: "Русский", zh: "中文",
+};
+
+export const FILE_STATUS_LABELS: Record<string, Record<string, string>> = {
+  en: { completed: "Completed", in_progress: "Processing", failed: "Failed", cancelled: "Cancelled" },
+  de: { completed: "Abgeschlossen", in_progress: "Wird verarbeitet", failed: "Fehlgeschlagen", cancelled: "Abgebrochen" },
+  es: { completed: "Completado", in_progress: "Procesando", failed: "Fallido", cancelled: "Cancelado" },
+  fr: { completed: "Terminé", in_progress: "Traitement", failed: "Échec", cancelled: "Annulé" },
+  it: { completed: "Completato", in_progress: "In elaborazione", failed: "Fallito", cancelled: "Annullato" },
+  ja: { completed: "完了", in_progress: "処理中", failed: "失敗", cancelled: "キャンセル済み" },
+  ko: { completed: "완료됨", in_progress: "처리 중", failed: "실패", cancelled: "취소됨" },
+  nl: { completed: "Voltooid", in_progress: "In behandeling", failed: "Mislukt", cancelled: "Geannuleerd" },
+  pl: { completed: "Ukończono", in_progress: "Przetwarzanie", failed: "Niepowodzenie", cancelled: "Anulowano" },
+  pt: { completed: "Concluído", in_progress: "Processando", failed: "Falhou", cancelled: "Cancelado" },
+  ru: { completed: "Завершено", in_progress: "Обработка", failed: "Ошибка", cancelled: "Отменено" },
+  zh: { completed: "已完成", in_progress: "处理中", failed: "失败", cancelled: "已取消" },
+};
+
+export const getFileStatusLabel = (status: string): string =>
+  FILE_STATUS_LABELS[CHATKIT_LOCALE][status] ?? status;
+
+export const MISSING_THREAD_MESSAGES: Record<string, string> = {
+  en: "This chat is no longer available and was removed from history.",
+  de: "Dieser Chat ist nicht mehr verfügbar und wurde aus dem Verlauf entfernt.",
+  es: "Este chat ya no está disponible y se eliminó del historial.",
+  fr: "Cette conversation n'est plus disponible et a été supprimée de l'historique.",
+  it: "Questa chat non è più disponibile ed è stata rimossa dalla cronologia.",
+  ja: "このチャットは利用できないため、履歴から削除しました。",
+  ko: "이 채팅은 더 이상 사용할 수 없어 기록에서 삭제되었습니다.",
+  nl: "Dit gesprek is niet meer beschikbaar en is uit de geschiedenis verwijderd.",
+  pl: "Ten czat jest już niedostępny i został usunięty z historii.",
+  pt: "Esta conversa não está mais disponível e foi removida do histórico.",
+  ru: "Этот разговор больше недоступен и был удален из истории.",
+  zh: "此聊天已不可用，已从历史记录中删除。",
+};
 
 type UiLabels = {
   temporary: string;
