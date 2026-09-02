@@ -10,9 +10,11 @@
     "backend": "./backend/scripts/run.sh"
   },
   "devDependencies": {
-    "@auth/core": "^0.40.0",
     "concurrently": "^9.1.2",
-    "dotenv": "^16.4.7",
-    "nodemailer": "^6.8.0"
+    "dotenv": "^16.4.7"
+  },
+  "dependencies": {
+    "@auth/core": "^0.41.3",
+    "nodemailer": "^8.0.11"
   }
 }
