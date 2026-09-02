@@ -13,13 +13,13 @@ const serverFile = path.join(root, "auth", "server.mjs");
 function readAuthEnvironment() {
     const authValues = existsSync(authFile) ? dotenv.parse(readFileSync(authFile)) : {};
     const authEntries = Object.entries(authValues).filter(([key]) => key.startsWith("AUTH_") || key === "CHATKIT_MAINTENANCE");
-        const legacyValues = existsSync(legacyEnvFile) ? dotenv.parse(readFileSync(legacyEnvFile)) : {};
-        const environment = Object.fromEntries(authEntries);
-        if (legacyValues.CHATKIT_MAINTENANCE !== undefined && environment.CHATKIT_MAINTENANCE === undefined) {
-            environment.CHATKIT_MAINTENANCE = legacyValues.CHATKIT_MAINTENANCE;
-        }
-        if (authEntries.length > 0) return environment;
-        return Object.fromEntries(Object.entries(legacyValues).filter(([key]) => key.startsWith("AUTH_") || key === "CHATKIT_MAINTENANCE"));
+    const legacyValues = existsSync(legacyEnvFile) ? dotenv.parse(readFileSync(legacyEnvFile)) : {};
+    const environment = Object.fromEntries(authEntries);
+    if (legacyValues.CHATKIT_MAINTENANCE !== undefined && environment.CHATKIT_MAINTENANCE === undefined) {
+        environment.CHATKIT_MAINTENANCE = legacyValues.CHATKIT_MAINTENANCE;
+    }
+    if (authEntries.length > 0) return environment;
+    return Object.fromEntries(Object.entries(legacyValues).filter(([key]) => key.startsWith("AUTH_") || key === "CHATKIT_MAINTENANCE"));
 }
 
 let child;
@@ -49,7 +49,7 @@ function restart() {
 }
 
 start();
-for (const watchedFile of [authFile, configFile]) {
+for (const watchedFile of [authFile, legacyEnvFile, configFile]) {
     watchFile(watchedFile, { interval: 500 }, (current, previous) => {
         if (current.mtimeMs !== previous.mtimeMs) restart();
     });
@@ -57,6 +57,7 @@ for (const watchedFile of [authFile, configFile]) {
 
 function shutdown(signal) {
     unwatchFile(authFile);
+    unwatchFile(legacyEnvFile);
     unwatchFile(configFile);
     child?.kill(signal);
 }
