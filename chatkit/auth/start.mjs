@@ -49,7 +49,7 @@ function restart() {
 }
 
 start();
-for (const watchedFile of [authFile, legacyEnvFile, configFile]) {
+for (const watchedFile of [authFile, configFile]) {
     watchFile(watchedFile, { interval: 500 }, (current, previous) => {
         if (current.mtimeMs !== previous.mtimeMs) restart();
     });
@@ -57,7 +57,6 @@ for (const watchedFile of [authFile, legacyEnvFile, configFile]) {
 
 function shutdown(signal) {
     unwatchFile(authFile);
-    unwatchFile(legacyEnvFile);
     unwatchFile(configFile);
     child?.kill(signal);
 }

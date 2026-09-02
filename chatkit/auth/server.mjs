@@ -33,6 +33,8 @@ const envBool = (name, defaultValue) => process.env[name] === undefined
 const emailLinkEnabled = envBool("AUTH_EMAIL_LINK", true);
 const localEmailEnabled = envBool("AUTH_EMAIL_LOCAL", true);
 const maintenanceMode = envBool("CHATKIT_MAINTENANCE", false);
+const recaptchaSiteKey = process.env.AUTH_RECAPTCHA_SITE_KEY?.trim();
+const recaptchaSecretKey = process.env.AUTH_RECAPTCHA_SECRET_KEY?.trim();
 const signOutTranslations = {
     en: ["Signout", "Are you sure you want to sign out?", "Sign out"],
     de: ["Abmelden", "Möchten Sie sich wirklich abmelden?", "Abmelden"],
@@ -110,6 +112,26 @@ function verifyPassword(password, encoded) {
         if (!/^[a-f0-9]{128}$/i.test(expected)) return false;
         return timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
     } catch { return false; }
+}
+
+async function verifyRecaptcha(token, remoteIp) {
+    if (!recaptchaSiteKey || !recaptchaSecretKey) return true;
+    if (!token) return false;
+    const body = new URLSearchParams({ secret: recaptchaSecretKey, response: token });
+    if (remoteIp) body.set("remoteip", remoteIp);
+    try {
+        const result = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body,
+        });
+        const verification = await result.json();
+        return verification.success === true
+            && verification.action === "login"
+            && (verification.score ?? 0) >= Number(process.env.AUTH_RECAPTCHA_MIN_SCORE || 0.5);
+    } catch {
+        return false;
+    }
 }
 
 const providers = [
@@ -207,6 +229,15 @@ const server = createServer(async (request, response) => {
         request.on("end", () => resolve(Buffer.concat(chunks)));
         request.on("error", reject);
     }) : undefined;
+    const requestPath = request.url ? new URL(request.url, publicUrl).pathname : "";
+    if (request.method === "POST" && ["/api/auth/signin/email", "/api/auth/callback/credentials"].includes(requestPath) && recaptchaSiteKey && recaptchaSecretKey) {
+        const submitted = new URLSearchParams(body?.toString() || "");
+        if (!await verifyRecaptcha(submitted.get("recaptchaToken"), request.socket.remoteAddress)) {
+            response.writeHead(403, { "content-type": "text/html; charset=utf-8" });
+            response.end("<!doctype html><html><body><h1>Security verification failed</h1><p>Please go back and try again.</p></body></html>");
+            return;
+        }
+    }
     const result = await Auth(new Request(`${publicUrl}${request.url}`, {
         method: request.method,
         headers: request.headers,
@@ -218,7 +249,7 @@ const server = createServer(async (request, response) => {
         const translations = signOutTranslations[requestLocale(request)] || signOutTranslations.en;
         responseBody = responseBody.replaceAll("Signout", translations[0]).replaceAll("Are you sure you want to sign out?", translations[1]).replaceAll("Sign out", translations[2]);
     }
-    if (request.method === "GET" && request.url === "/api/auth/signin") {
+    if (request.method === "GET" && requestPath === "/api/auth/signin") {
         const translations = signInTranslations[requestLocale(request)] || signInTranslations.en;
         responseBody = responseBody
             .replace(/(<form action="[^"]*\/signin\/email"[\s\S]*?<button[^>]*>)[\s\S]*?(<\/button>)/, `$1${translations.disposableLink}$2`)
@@ -228,6 +259,10 @@ const server = createServer(async (request, response) => {
             .replaceAll("Sign in with GitHub", `${translations.oauth} GitHub`)
             .replaceAll("Sign in with Apple", `${translations.oauth} Apple`)
             .replaceAll(">Email<", `>${translations.localEmailField}<`);
+        if (recaptchaSiteKey && recaptchaSecretKey && responseBody.includes("</body>")) {
+            const siteKey = JSON.stringify(recaptchaSiteKey);
+            responseBody = responseBody.replace("</body>", `<script src="https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(recaptchaSiteKey)}"></script><script>(function(){const key=${siteKey};const forms=document.querySelectorAll('form[action*="/signin/email"],form[action*="/callback/credentials"]');forms.forEach(function(form){form.addEventListener('submit',function(event){if(form.dataset.recaptchaReady==='true')return;event.preventDefault();grecaptcha.ready(function(){grecaptcha.execute(key,{action:'login'}).then(function(token){const input=document.createElement('input');input.type='hidden';input.name='recaptchaToken';input.value=token;form.appendChild(input);form.dataset.recaptchaReady='true';form.submit();});});});});}());</script></body>`);
+        }
     }
     response.writeHead(result.status, Object.fromEntries(result.headers));
     response.end(responseBody);

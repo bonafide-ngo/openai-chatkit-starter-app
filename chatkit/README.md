@@ -45,6 +45,11 @@ Set `AUTH_EMAIL_LINK=false` to hide email magic-link login, or
 `AUTH_EMAIL_LOCAL=false` to hide local email/password login. Both default to
 `true`; local email/password login is shown only when `localUsers` is non-empty.
 
+Optional Google reCAPTCHA v3 protection is enabled when both
+`AUTH_RECAPTCHA_SITE_KEY` and `AUTH_RECAPTCHA_SECRET_KEY` are set in
+`.env.auth.local`. The site key is used only by the sign-in page; the secret
+key stays server-side. `AUTH_RECAPTCHA_MIN_SCORE` defaults to `0.5`.
+
 Set `CHATKIT_MAINTENANCE=true` in `.env.local` to disable the complete system.
 The frontend shows only a maintenance message, while backend and Auth.js
 requests are rejected. Restart the development stack after changing this flag.
