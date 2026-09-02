@@ -44,10 +44,10 @@ export function ChatKitPanel({
     theme,
     locale: CHATKIT_LOCALE,
     initialThread,
-    onChatkitThreadChange: ({ threadId }) => {
+    onThreadChange: ({ threadId }) => {
       onThreadChange(typeof threadId === "string" ? threadId : null);
     },
-    onChatkitError: ({ error }) => {
+    onError: ({ error }) => {
       onChatkitError?.(
         error instanceof Error ? error : new Error(String(error)),
       );

@@ -10,6 +10,8 @@ dependencies = [
     "openai-agents>=0.21.1,<1",
     "openai-chatkit>=1.4.0,<2",
     "python-multipart>=0.0.9,<1",
+    "python-docx>=1.1,<2",
+    "reportlab>=4.2,<5",
 ]
 
 [project.optional-dependencies]

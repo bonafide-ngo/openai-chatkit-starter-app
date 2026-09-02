@@ -9,15 +9,20 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-if [ ! -d ".venv" ]; then
-  echo "Creating virtual env in $PROJECT_ROOT/.venv ..."
+if [ ! -x ".venv/bin/python" ] || ! ".venv/bin/python" -c "import sys" >/dev/null 2>&1; then
+  if [ -d ".venv" ]; then
+    echo "Recreating unusable virtual env in $PROJECT_ROOT/.venv ..."
+    rm -rf .venv
+  else
+    echo "Creating virtual env in $PROJECT_ROOT/.venv ..."
+  fi
   python -m venv .venv
 fi
 
 source .venv/bin/activate
 
 echo "Installing backend deps (editable) ..."
-pip install -e . >/dev/null
+python -m pip install -e . >/dev/null
 
 # Load env vars from the repo's .env.local (if present). This includes the
 # optional vector-store configuration as well as the API key.
@@ -40,5 +45,5 @@ if [ -z "${CHATKIT_PUBLIC_BASE_URL:-}" ]; then
 fi
 
 echo "Starting ChatKit backend on http://127.0.0.1:8000 ..."
-exec uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+exec python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 

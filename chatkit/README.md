@@ -29,6 +29,7 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
 | `OPENAI_AGENT_INSTRUCTIONS` | built-in assistant prompt | System instructions passed to the assistant. |
 | `OPENAI_VECTOR_STORE_IDS` | none | Comma-separated OpenAI vector store IDs used by the assistant for file search. |
+| `CHATKIT_APP_TITLE` | `ChatKit` | Application title shown in exported documents. |
 | `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
 | `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_localhost_dev` | ChatKit domain key. |
 | `CHATKIT_STORE_PATH` | `.data/chatkit-store.json` | File-store location relative to `backend/`. |
@@ -63,6 +64,15 @@ The file list in the same panel supports deleting individual files or all files
 from the selected store. Deletion removes the vector-store association and then
 deletes the underlying OpenAI File from the account. This assumes files managed
 by this app are not shared with another vector store or workflow.
+
+## Chat Export
+
+When a conversation is active, use the `Export` menu in the header to choose
+`PDF`, `DOCX`, or `MD` and download the complete stored conversation. Exports include
+the configured application title, chat title, export date/time, and full thread
+history, including messages older than the context window used by the assistant.
+Temporary conversations can be exported while they are active, but are lost
+when the backend restarts.
 
 ## Storage and Privacy
 

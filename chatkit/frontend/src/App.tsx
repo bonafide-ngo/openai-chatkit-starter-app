@@ -5,6 +5,9 @@ import { KnowledgeBasePanel } from "./components/KnowledgeBasePanel";
 import {
   CHATKIT_DELETE_ALL_URL,
   CHATKIT_API_URL,
+  CHATKIT_TEMPORARY_API_URL,
+  CHATKIT_LOCALE,
+  EXPORT_UI_LABELS,
   UI_LABELS,
 } from "./lib/config";
 
@@ -27,6 +30,7 @@ export default function App() {
   const [persistentThreadId, setPersistentThreadId] = useState<string | null>(
     () => localStorage.getItem("chatkit-persistent-thread"),
   );
+  const [temporaryThreadId, setTemporaryThreadId] = useState<string | null>(null);
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
   const [localAttachment, setLocalAttachment] = useState<Attachment | null>(null);
 
@@ -72,6 +76,25 @@ export default function App() {
 
     localStorage.removeItem("chatkit-persistent-thread");
     window.location.reload();
+  };
+
+  const activeThreadId = chatMode === "persistent" ? persistentThreadId : temporaryThreadId;
+
+  const exportThread = async (format: "pdf" | "docx" | "md") => {
+    if (!activeThreadId) return;
+    const baseUrl = chatMode === "temporary" ? CHATKIT_TEMPORARY_API_URL : CHATKIT_API_URL;
+    const response = await fetch(`${baseUrl}/threads/${encodeURIComponent(activeThreadId)}/export/${format}?locale=${CHATKIT_LOCALE}`);
+    if (!response.ok) {
+      window.alert(EXPORT_UI_LABELS.exportFailed);
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `chat-${activeThreadId}.${format}`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const useFileLocally = async (file: File): Promise<Attachment> => {
@@ -121,6 +144,23 @@ export default function App() {
             {UI_LABELS.files}
           </button>
 
+          <select
+            defaultValue=""
+            onChange={(event) => {
+              const format = event.target.value as "pdf" | "docx" | "md" | "";
+              event.currentTarget.value = "";
+              if (format) void exportThread(format);
+            }}
+            disabled={!activeThreadId}
+            aria-label={EXPORT_UI_LABELS.exportChat}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <option value="">{EXPORT_UI_LABELS.exportChat}</option>
+            <option value="pdf">{EXPORT_UI_LABELS.exportPdf}</option>
+            <option value="docx">{EXPORT_UI_LABELS.exportDocx}</option>
+            <option value="md">MD</option>
+          </select>
+
           <button
             type="button"
             onClick={toggleTheme}
@@ -149,7 +189,7 @@ export default function App() {
           mode="temporary"
           active={chatMode === "temporary"}
           initialThread={null}
-          onThreadChange={() => undefined}
+          onThreadChange={setTemporaryThreadId}
           onDeleteAll={deleteAllHistory}
           localAttachment={localAttachment}
           onLocalAttachmentConsumed={() => setLocalAttachment(null)}

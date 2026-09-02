@@ -88,6 +88,28 @@ export const CURRENT_UI_LABELS: Record<string, UiLabels> = {
 
 export const UI_LABELS = CURRENT_UI_LABELS[CHATKIT_LOCALE] ?? CURRENT_UI_LABELS.en;
 
+export const EXPORT_LABELS: Record<string, {
+  exportChat: string;
+  exportPdf: string;
+  exportDocx: string;
+  exportFailed: string;
+}> = {
+  en: { exportChat: "Export", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Unable to export chat." },
+  de: { exportChat: "Exportieren", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Chat konnte nicht exportiert werden." },
+  es: { exportChat: "Exportar", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "No se pudo exportar el chat." },
+  fr: { exportChat: "Exporter", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Impossible d'exporter la conversation." },
+  it: { exportChat: "Esporta", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Impossibile esportare la conversazione." },
+  ja: { exportChat: "エクスポート", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "会話をエクスポートできません。" },
+  ko: { exportChat: "내보내기", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "대화를 내보낼 수 없습니다." },
+  nl: { exportChat: "Exporteren", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Kan gesprek niet exporteren." },
+  pl: { exportChat: "Eksportuj", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Nie można wyeksportować rozmowy." },
+  pt: { exportChat: "Exportar", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Não foi possível exportar a conversa." },
+  ru: { exportChat: "Экспорт", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "Не удалось экспортировать разговор." },
+  zh: { exportChat: "导出", exportPdf: "PDF", exportDocx: "DOCX", exportFailed: "无法导出对话。" },
+};
+
+export const EXPORT_UI_LABELS = EXPORT_LABELS[CHATKIT_LOCALE] ?? EXPORT_LABELS.en;
+
 export const CHATKIT_DELETE_ALL_URL = `${CHATKIT_API_URL.replace(/\/$/, "")}/threads`;
 
 /**

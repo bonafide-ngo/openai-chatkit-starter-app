@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from chatkit.server import StreamingResult
@@ -14,6 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
 from .memory_store import EphemeralStore
+from .export import build_docx, build_markdown, build_pdf, conversation_rows, export_text
 from .server import GENERATED_FILES, StarterChatServer, delete_all_generated_files
 from .vector_store import (
     configured_vector_store_ids,
@@ -28,6 +30,7 @@ from openai import AsyncOpenAI
 
 
 app = FastAPI(title="ChatKit Starter API")
+APP_TITLE = os.getenv("CHATKIT_APP_TITLE", "ChatKit")
 
 app.add_middleware(
     CORSMiddleware,
@@ -88,6 +91,51 @@ async def chatkit_endpoint(request: Request) -> Response:
 @app.post("/chatkit/temporary")
 async def temporary_chatkit_endpoint(request: Request) -> Response:
     return await process_chatkit_request(request, temporary_chatkit_server)
+
+
+async def export_thread(thread_id: str, extension: str, request: Request, locale: str) -> Response:
+    server = temporary_chatkit_server if request.url.path.startswith("/chatkit/temporary") else chatkit_server
+    thread = await server.store.load_thread(thread_id, {"request": request})
+    items_page = await server.store.load_thread_items(
+        thread_id,
+        after=None,
+        limit=10000,
+        order="asc",
+        context={"request": request},
+    )
+    labels = export_text(locale)
+    title = thread.title or labels["chat_export"]
+    rows = conversation_rows(thread, items_page.data, locale)
+    exported_at = datetime.now(timezone.utc)
+    if extension == "pdf":
+        output = build_pdf(APP_TITLE, title, rows, exported_at, locale)
+        media_type = "application/pdf"
+    elif extension == "docx":
+        output = build_docx(APP_TITLE, title, rows, exported_at, locale)
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    else:
+        output = build_markdown(APP_TITLE, title, rows, exported_at, locale)
+        media_type = "text/markdown; charset=utf-8"
+    filename = f"chat-{thread_id}.{extension}"
+    return Response(
+        content=output.getvalue(),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/chatkit/threads/{thread_id}/export/{extension}")
+async def export_persistent_thread(thread_id: str, extension: str, request: Request, locale: str = "en") -> Response:
+    if extension not in {"pdf", "docx", "md"}:
+        raise HTTPException(status_code=400, detail="Unsupported export format")
+    return await export_thread(thread_id, extension, request, locale)
+
+
+@app.get("/chatkit/temporary/threads/{thread_id}/export/{extension}")
+async def export_temporary_thread(thread_id: str, extension: str, request: Request, locale: str = "en") -> Response:
+    if extension not in {"pdf", "docx", "md"}:
+        raise HTTPException(status_code=400, detail="Unsupported export format")
+    return await export_thread(thread_id, extension, request, locale)
 
 
 @app.delete("/chatkit/threads")
