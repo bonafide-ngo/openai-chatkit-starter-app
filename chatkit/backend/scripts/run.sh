@@ -19,11 +19,11 @@ source .venv/bin/activate
 echo "Installing backend deps (editable) ..."
 pip install -e . >/dev/null
 
-# Load env vars from the repo's .env.local (if present) so OPENAI_API_KEY
-# does not need to be exported manually.
+# Load env vars from the repo's .env.local (if present). This includes the
+# optional vector-store configuration as well as the API key.
 ENV_FILE="$PROJECT_ROOT/../.env.local"
-if [ -z "${OPENAI_API_KEY:-}" ] && [ -f "$ENV_FILE" ]; then
-  echo "Sourcing OPENAI_API_KEY from $ENV_FILE"
+if [ -f "$ENV_FILE" ]; then
+  echo "Sourcing backend configuration from $ENV_FILE"
   # shellcheck disable=SC1090
   set -a
   . "$ENV_FILE"

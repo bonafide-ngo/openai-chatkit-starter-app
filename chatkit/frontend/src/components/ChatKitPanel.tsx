@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import type { Attachment } from "@openai/chatkit";
 import { ChatKit, useChatKit } from "@openai/chatkit-react";
 import {
   CHATKIT_API_DOMAIN_KEY,
@@ -16,6 +18,8 @@ interface ChatKitPanelProps {
   initialThread: string | null;
   onThreadChange: (threadId: string | null) => void;
   active: boolean;
+  localAttachment: Attachment | null;
+  onLocalAttachmentConsumed: () => void;
 }
 
 export function ChatKitPanel({
@@ -26,6 +30,8 @@ export function ChatKitPanel({
   initialThread,
   onThreadChange,
   active,
+  localAttachment,
+  onLocalAttachmentConsumed,
 }: ChatKitPanelProps) {
   const chatkit = useChatKit({
     api: {
@@ -64,10 +70,19 @@ export function ChatKitPanel({
     },
     composer: {
       attachments: {
-        enabled: true,
+        enabled: false,
       },
     },
   });
+
+  useEffect(() => {
+    if (!active || !localAttachment) return;
+    void chatkit.sendUserMessage({
+      text: "Please analyze the attached file.",
+      attachments: [localAttachment],
+    });
+    onLocalAttachmentConsumed();
+  }, [active, chatkit, localAttachment, onLocalAttachmentConsumed]);
 
   return (
     <div className={`${active ? "flex" : "hidden"} relative h-full w-full flex-col overflow-hidden bg-white shadow-sm transition-colors dark:bg-slate-900`}>

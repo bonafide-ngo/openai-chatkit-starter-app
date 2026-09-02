@@ -27,6 +27,8 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | --- | --- | --- |
 | `OPENAI_API_KEY` | none | Backend authentication with OpenAI. |
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
+| `OPENAI_AGENT_INSTRUCTIONS` | built-in assistant prompt | System instructions passed to the assistant. |
+| `OPENAI_VECTOR_STORE_IDS` | none | Comma-separated OpenAI vector store IDs used by the assistant for file search. |
 | `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
 | `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_localhost_dev` | ChatKit domain key. |
 | `CHATKIT_STORE_PATH` | `.data/chatkit-store.json` | File-store location relative to `backend/`. |
@@ -36,6 +38,31 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 
 Environment variables are loaded from `chatkit/.env.local`. Vite also uses
 this file for `VITE_*` variables.
+
+### Vector store
+
+Create an OpenAI vector store, upload and index files in it, then add its ID to
+`.env.local`:
+
+```env
+OPENAI_VECTOR_STORE_IDS=vs_123
+```
+
+Multiple stores can be provided as a comma-separated list. When at least one ID
+is configured, the assistant receives the hosted file-search tool and can use
+the indexed files to answer questions. Leaving the variable empty disables
+vector-store search.
+
+Use the `Files` button in the app to choose a file. The default local option
+sends it to the active conversation only. Choosing the knowledge-base option
+requires selecting one of the configured stores and waits for indexing to
+finish. Uploading another file with the same name to the same store replaces
+and reindexes the previous file after the new version succeeds.
+
+The file list in the same panel supports deleting individual files or all files
+from the selected store. Deletion removes the vector-store association and then
+deletes the underlying OpenAI File from the account. This assumes files managed
+by this app are not shared with another vector store or workflow.
 
 ## Storage and Privacy
 

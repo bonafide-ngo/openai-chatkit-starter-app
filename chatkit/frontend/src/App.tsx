@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import type { Attachment } from "@openai/chatkit";
 import { ChatKitPanel } from "./components/ChatKitPanel";
+import { KnowledgeBasePanel } from "./components/KnowledgeBasePanel";
 import {
   CHATKIT_DELETE_ALL_URL,
+  CHATKIT_API_URL,
   UI_LABELS,
 } from "./lib/config";
 
@@ -24,6 +27,8 @@ export default function App() {
   const [persistentThreadId, setPersistentThreadId] = useState<string | null>(
     () => localStorage.getItem("chatkit-persistent-thread"),
   );
+  const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
+  const [localAttachment, setLocalAttachment] = useState<Attachment | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.colorScheme = theme;
@@ -69,6 +74,21 @@ export default function App() {
     window.location.reload();
   };
 
+  const useFileLocally = async (file: File): Promise<Attachment> => {
+    const response = await fetch(`${CHATKIT_API_URL}/local-uploads`, {
+      method: "POST",
+      headers: {
+        "content-type": file.type || "application/octet-stream",
+        "x-filename": file.name,
+      },
+      body: file,
+    });
+    if (!response.ok) throw new Error(UI_LABELS.unableToUploadLocalFile);
+    const attachment = await response.json() as Attachment;
+    setLocalAttachment(attachment);
+    return attachment;
+  };
+
   return (
     <main className="flex h-screen w-screen flex-col overflow-hidden bg-slate-100 dark:bg-slate-950">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900">
@@ -95,6 +115,14 @@ export default function App() {
 
           <button
             type="button"
+            onClick={() => setKnowledgeBaseOpen(true)}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            {UI_LABELS.files}
+          </button>
+
+          <button
+            type="button"
             onClick={toggleTheme}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
             aria-label={`${UI_LABELS.switchTo} ${theme === "dark" ? UI_LABELS.light : UI_LABELS.dark}`}
@@ -104,7 +132,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 w-full">
+      <div className="relative min-h-0 flex-1 w-full">
         <ChatKitPanel
           theme={theme}
           mode="persistent"
@@ -113,6 +141,8 @@ export default function App() {
           onThreadChange={handleThreadChange}
           onChatkitError={handlePersistentChatkitError}
           onDeleteAll={deleteAllHistory}
+          localAttachment={localAttachment}
+          onLocalAttachmentConsumed={() => setLocalAttachment(null)}
         />
         <ChatKitPanel
           theme={theme}
@@ -121,6 +151,13 @@ export default function App() {
           initialThread={null}
           onThreadChange={() => undefined}
           onDeleteAll={deleteAllHistory}
+          localAttachment={localAttachment}
+          onLocalAttachmentConsumed={() => setLocalAttachment(null)}
+        />
+        <KnowledgeBasePanel
+          open={knowledgeBaseOpen}
+          onClose={() => setKnowledgeBaseOpen(false)}
+          onUseLocally={useFileLocally}
         />
       </div>
     </main >

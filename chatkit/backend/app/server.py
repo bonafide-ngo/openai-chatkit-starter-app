@@ -11,6 +11,7 @@ from uuid import uuid4
 from agents import (
     Agent,
     CodeInterpreterTool,
+    FileSearchTool,
     RawResponsesStreamEvent,
     Runner,
     WebSearchTool,
@@ -45,6 +46,22 @@ from .memory_store import MemoryStore
 
 MAX_RECENT_ITEMS = 30
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+AGENT_INSTRUCTIONS = os.getenv(
+    "OPENAI_AGENT_INSTRUCTIONS",
+    "You are a concise, helpful assistant. "
+    "Use web search when the user asks for current or up-to-date information. "
+    "Use the code interpreter when calculations, data analysis, "
+    "Python execution, or generating/analyzing data would be useful. "
+    "When the user uploads a file, inspect and analyze it when relevant. "
+    "When you create a file for the user, include a Markdown download link "
+    "using the exact sandbox:/mnt/data/<filename> URL returned by the tool. "
+    "Do not add any other links for that file.",
+)
+VECTOR_STORE_IDS = [
+    vector_store_id.strip()
+    for vector_store_id in os.getenv("OPENAI_VECTOR_STORE_IDS", "").split(",")
+    if vector_store_id.strip()
+]
 TEXT_FILE_MIME_TYPES = {
     "text/x-python-script",
     "text/x-python",
@@ -83,17 +100,9 @@ assistant_agent = Agent[AgentContext[dict[str, Any]]](
                 },
             }
         ),
-    ],
-    instructions=(
-        "You are a concise, helpful assistant. "
-        "Use web search when the user asks for current or up-to-date information. "
-        "Use the code interpreter when calculations, data analysis, "
-        "Python execution, or generating/analyzing data would be useful. "
-        "When the user uploads a file, inspect and analyze it when relevant. "
-        "When you create a file for the user, include a Markdown download link "
-        "using the exact sandbox:/mnt/data/<filename> URL returned by the tool. "
-        "Do not add any other links for that file."
-    ),
+    ]
+    + ([FileSearchTool(vector_store_ids=VECTOR_STORE_IDS)] if VECTOR_STORE_IDS else []),
+    instructions=AGENT_INSTRUCTIONS,
 )
 
 class StarterAttachmentConverter(ThreadItemConverter):

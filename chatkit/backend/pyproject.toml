@@ -9,6 +9,7 @@ dependencies = [
     "openai>=1.40",
     "openai-agents>=0.21.1,<1",
     "openai-chatkit>=1.4.0,<2",
+    "python-multipart>=0.0.9,<1",
 ]
 
 [project.optional-dependencies]

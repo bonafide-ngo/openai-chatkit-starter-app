@@ -8,13 +8,23 @@ import tempfile
 from pathlib import Path
 
 from chatkit.server import StreamingResult
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import File, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
 from .memory_store import EphemeralStore
 from .server import GENERATED_FILES, StarterChatServer, delete_all_generated_files
+from .vector_store import (
+    configured_vector_store_ids,
+    delete_vector_store_file,
+    list_vector_store_files,
+    require_vector_store,
+    store_label,
+    upload_and_replace,
+)
+from chatkit.types import AttachmentCreateParams
+from openai import AsyncOpenAI
 
 
 app = FastAPI(title="ChatKit Starter API")
@@ -49,6 +59,10 @@ temporary_chatkit_server = StarterChatServer(
 )
 
 
+def vector_store_client() -> AsyncOpenAI:
+    return AsyncOpenAI()
+
+
 async def process_chatkit_request(
     request: Request,
     server: StarterChatServer,
@@ -81,6 +95,70 @@ async def delete_all_threads(request: Request) -> Response:
     await chatkit_server.store.delete_all({"request": request})
     delete_all_generated_files()
     return Response(status_code=204)
+
+
+@app.get("/chatkit/knowledge-base/stores")
+async def list_configured_vector_stores() -> list[dict[str, str]]:
+    client = vector_store_client()
+    stores = []
+    for vector_store_id in configured_vector_store_ids():
+        stores.append(
+            {
+                "id": vector_store_id,
+                "name": await store_label(client, vector_store_id),
+            }
+        )
+    return stores
+
+
+@app.get("/chatkit/knowledge-base/stores/{vector_store_id}/files")
+async def list_knowledge_base_files(vector_store_id: str) -> list[dict]:
+    require_vector_store(vector_store_id)
+    return await list_vector_store_files(vector_store_client(), vector_store_id)
+
+
+@app.post("/chatkit/knowledge-base/stores/{vector_store_id}/files")
+async def upload_knowledge_base_file(
+    vector_store_id: str,
+    file: UploadFile = File(...),
+) -> dict:
+    require_vector_store(vector_store_id)
+    return await upload_and_replace(vector_store_client(), vector_store_id, file)
+
+
+@app.delete("/chatkit/knowledge-base/stores/{vector_store_id}/files/{file_id}")
+async def delete_knowledge_base_file(vector_store_id: str, file_id: str) -> Response:
+    require_vector_store(vector_store_id)
+    await delete_vector_store_file(vector_store_client(), vector_store_id, file_id)
+    return Response(status_code=204)
+
+
+@app.delete("/chatkit/knowledge-base/stores/{vector_store_id}/files")
+async def delete_all_knowledge_base_files(vector_store_id: str) -> Response:
+    require_vector_store(vector_store_id)
+    client = vector_store_client()
+    files = await list_vector_store_files(client, vector_store_id)
+    for file in files:
+        await delete_vector_store_file(client, vector_store_id, file["id"])
+    return Response(status_code=204)
+
+
+@app.post("/chatkit/local-uploads")
+async def upload_local_file(request: Request) -> dict:
+    filename = request.headers.get("x-filename", "uploaded-file")
+    mime_type = request.headers.get("content-type", "application/octet-stream")
+    content = await request.body()
+    if not content:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty")
+    if len(content) > MAX_ATTACHMENT_BYTES:
+        raise HTTPException(status_code=413, detail="Attachment is too large")
+
+    attachment = await chatkit_server.attachment_store.create_attachment(
+        AttachmentCreateParams(name=filename, mime_type=mime_type),
+        {"request": request},
+    )
+    (UPLOAD_DIR / attachment.id).write_bytes(content)
+    return attachment.model_dump(mode="json")
 
 UPLOAD_DIR = Path("/tmp/chatkit-uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
