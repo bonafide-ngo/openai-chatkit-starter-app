@@ -22,6 +22,7 @@ const authUsers = new Map([...localUsers.values()].map((user) => {
     const email = user.email.toLowerCase();
     return [email, { id: email, email, name: email }];
 }));
+const authAccounts = new Map();
 const verificationTokens = new Map();
 const secret = process.env.AUTH_SECRET;
 if (!secret || secret.length < 32) throw new Error("AUTH_SECRET must be at least 32 characters.");
@@ -178,6 +179,14 @@ const authOptions = {
         },
         async getUserByEmail(email) {
             return authUsers.get(email.toLowerCase()) || null;
+        },
+        async getUserByAccount({ provider, providerAccountId }) {
+            const account = authAccounts.get(`${provider}:${providerAccountId}`);
+            return account ? authUsers.get(account.userId) || null : null;
+        },
+        async linkAccount(account) {
+            authAccounts.set(`${account.provider}:${account.providerAccountId}`, account);
+            return account;
         },
         async updateUser(user) {
             const existing = [...authUsers.values()].find((entry) => entry.id === user.id);
