@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import os
+import shlex
 from pathlib import Path
 from typing import Any, AsyncIterator
 from uuid import uuid4
@@ -15,6 +16,13 @@ from agents import (
     RawResponsesStreamEvent,
     Runner,
     WebSearchTool,
+)
+from agents.mcp import (
+    MCPServer,
+    MCPServerManager,
+    MCPServerSse,
+    MCPServerStdio,
+    MCPServerStreamableHttp,
 )
 from chatkit.agents import (
     AgentContext,
@@ -57,6 +65,11 @@ AGENT_INSTRUCTIONS = os.getenv(
     "using the exact sandbox:/mnt/data/<filename> URL returned by the tool. "
     "Do not add any other links for that file.",
 )
+MCP_AGENT_INSTRUCTIONS = (
+    "When MCP tools are available, treat them as available capabilities. "
+    "Use an MCP tool when it is relevant to the user's request, and do not "
+    "claim that MCP is unavailable if an MCP tool is listed for this run."
+)
 VECTOR_STORE_IDS = [
     vector_store_id.strip()
     for vector_store_id in os.getenv("OPENAI_VECTOR_STORE_IDS", "").split(",")
@@ -74,6 +87,88 @@ GENERATED_FILE_DIR.mkdir(parents=True, exist_ok=True)
 GENERATED_FILES: dict[str, tuple[Path, str, str | None]] = {}
 
 
+def _mcp_approval_policy() -> str:
+    policy = os.getenv("MCP_REQUIRE_APPROVAL", "never").strip().lower()
+    return policy if policy in {"always", "never"} else "never"
+
+
+def _mcp_timeout_seconds() -> float:
+    try:
+        return max(5.0, float(os.getenv("MCP_CLIENT_TIMEOUT_SECONDS", "30")))
+    except ValueError:
+        return 30.0
+
+
+def configured_mcp_server(settings: dict[str, Any] | None = None) -> MCPServer | None:
+    if settings is None:
+        settings = {
+            "enabled": os.getenv("MCP_ENABLED", "false"),
+            "transport": os.getenv("MCP_TRANSPORT", "streamable-http"),
+            "name": os.getenv("MCP_SERVER_NAME", "Configured MCP server"),
+            "url": os.getenv("MCP_SERVER_URL", ""),
+            "command": os.getenv("MCP_SERVER_COMMAND", ""),
+            "arguments": os.getenv("MCP_SERVER_ARGS", ""),
+            "authToken": os.getenv("MCP_AUTH_TOKEN", ""),
+        }
+
+    def value(key: str, default: str = "") -> str:
+        configured = settings.get(key)
+        return str(configured) if configured is not None else os.getenv(key, default)
+
+    if value("enabled", "false").strip().lower() != "true":
+        return None
+
+    transport = value("transport", "streamable-http").strip().lower()
+    name = value("name", "Configured MCP server").strip()
+    approval = _mcp_approval_policy()
+
+    if transport in {"streamable-http", "http"}:
+        url = value("url").strip()
+        if not url:
+            return None
+        headers = {}
+        token = value("authToken").strip()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return MCPServerStreamableHttp(
+            params={"url": url, "headers": headers},
+            cache_tools_list=False,
+            name=name,
+            client_session_timeout_seconds=_mcp_timeout_seconds(),
+            require_approval=approval,
+        )
+
+    if transport == "sse":
+        url = value("url").strip()
+        if not url:
+            return None
+        headers = {}
+        token = value("authToken").strip()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        return MCPServerSse(
+            params={"url": url, "headers": headers},
+            cache_tools_list=False,
+            name=name,
+            client_session_timeout_seconds=_mcp_timeout_seconds(),
+            require_approval=approval,
+        )
+
+    if transport == "stdio":
+        command = value("command", "").strip()
+        if not command:
+            return None
+        arguments = shlex.split(value("arguments", ""))
+        return MCPServerStdio(
+            params={"command": command, "args": arguments},
+            cache_tools_list=False,
+            name=name,
+            require_approval=approval,
+        )
+
+    return None
+
+
 def delete_generated_files_for_thread(thread_id: str) -> None:
     for file_id, (path, _, generated_thread_id) in list(GENERATED_FILES.items()):
         if generated_thread_id == thread_id:
@@ -87,23 +182,46 @@ def delete_all_generated_files() -> None:
     GENERATED_FILES.clear()
 
 
-assistant_agent = Agent[AgentContext[dict[str, Any]]](
-    model=MODEL,
-    name="Starter Assistant",
-    tools=[
-        WebSearchTool(),
-        CodeInterpreterTool(
-            tool_config={
-                "type": "code_interpreter",
-                "container": {
-                    "type": "auto",
-                },
-            }
-        ),
-    ]
-    + ([FileSearchTool(vector_store_ids=VECTOR_STORE_IDS)] if VECTOR_STORE_IDS else []),
-    instructions=AGENT_INSTRUCTIONS,
-)
+def build_assistant_agent(
+    mcp_server: MCPServer | None = None,
+) -> Agent[AgentContext[dict[str, Any]]]:
+    active_servers = [mcp_server] if mcp_server else []
+    mcp_instructions = MCP_AGENT_INSTRUCTIONS
+    if active_servers:
+        server_name = active_servers[0].name
+        mcp_instructions = (
+            f"{MCP_AGENT_INSTRUCTIONS} There is one active MCP server: {server_name}. "
+            "When a request falls within an active MCP server's scope, use its MCP "
+            "tools before web search, file search, or general model knowledge. "
+            "When you use an MCP tool, clearly inform the user in your final answer "
+            f"that the relevant information came from the MCP server '{server_name}'. "
+            "If you combine MCP with other sources, like web search, file search, "
+            "or general model knowledge, explain that naturally as well. Do not "
+            "claim or imply that information came from MCP if you did not call an "
+            "MCP tool."
+        )
+
+    return Agent[AgentContext[dict[str, Any]]](
+        model=MODEL,
+        name="Starter Assistant",
+        tools=[
+            WebSearchTool(),
+            CodeInterpreterTool(
+                tool_config={
+                    "type": "code_interpreter",
+                    "container": {
+                        "type": "auto",
+                    },
+                }
+            ),
+        ]
+        + ([FileSearchTool(vector_store_ids=VECTOR_STORE_IDS)] if VECTOR_STORE_IDS else []),
+        mcp_servers=active_servers,
+        instructions=f"{AGENT_INSTRUCTIONS}\n\n{mcp_instructions}",
+    )
+
+
+assistant_agent = build_assistant_agent()
 
 class StarterAttachmentConverter(ThreadItemConverter):
     @staticmethod
@@ -274,18 +392,29 @@ class StarterChatServer(ChatKitServer[dict[str, Any]]):
             request_context=context,
         )
 
-        result = Runner.run_streamed(
-            assistant_agent,
-            agent_input,
-            context=agent_context,
-        )
+        request = context.get("request")
+        app_state = getattr(getattr(request, "app", None), "state", None)
+        user_config = app_state.mcp_configurations.get(context.get("user_id")) if app_state else None
+        user_mcp_server = configured_mcp_server(user_config) if user_config else None
+        default_manager = getattr(app_state, "mcp_manager", None)
 
-        response_converter = StarterResponseStreamConverter(
-            {**context, "thread_id": thread.id}
-        )
-        async for event in stream_agent_response(
-            agent_context,
-            AnnotationCompatibleResult(result, response_converter),
-            converter=response_converter,
-        ):
-            yield event
+        async with MCPServerManager([user_mcp_server] if user_mcp_server else []) as user_manager:
+            active_server = user_manager.active_servers[0] if user_manager.active_servers else None
+            if active_server is None and default_manager is not None and default_manager.active_servers:
+                active_server = default_manager.active_servers[0]
+            agent = build_assistant_agent(active_server)
+            result = Runner.run_streamed(
+                agent,
+                agent_input,
+                context=agent_context,
+            )
+
+            response_converter = StarterResponseStreamConverter(
+                {**context, "thread_id": thread.id}
+            )
+            async for event in stream_agent_response(
+                agent_context,
+                AnnotationCompatibleResult(result, response_converter),
+                converter=response_converter,
+            ):
+                yield event

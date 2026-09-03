@@ -146,6 +146,50 @@ export const CURRENT_UI_LABELS: Record<string, UiLabels> = {
 
 export const UI_LABELS = CURRENT_UI_LABELS[CHATKIT_LOCALE] ?? CURRENT_UI_LABELS.en;
 
+export type McpUiLabels = {
+  description: string;
+  enable: string;
+  enableDescription: string;
+  serverName: string;
+  serverNamePlaceholder: string;
+  transport: string;
+  streamableHttp: string;
+  sse: string;
+  stdio: string;
+  command: string;
+  commandPlaceholder: string;
+  arguments: string;
+  argumentsPlaceholder: string;
+  serverUrl: string;
+  serverUrlPlaceholder: string;
+  bearerToken: string;
+  optional: string;
+  localStorageNotice: string;
+  saved: string;
+  saveSettings: string;
+};
+
+export const MCP_UI_LABELS: Record<string, McpUiLabels> = {
+  en: { description: "Configure a Model Context Protocol server.", enable: "Enable MCP", enableDescription: "Allow the assistant to use this server.", serverName: "Server name", serverNamePlaceholder: "My MCP server", transport: "Transport", streamableHttp: "Streamable HTTP", sse: "SSE", stdio: "Local process (stdio)", command: "Command", commandPlaceholder: "npx", arguments: "Arguments", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "Server URL", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Bearer token", optional: "Optional", localStorageNotice: "Settings are stored only in this browser. They are not sent to the backend by this panel.", saved: "Saved", saveSettings: "Save settings" },
+  de: { description: "Konfigurieren Sie einen Model-Context-Protocol-Server.", enable: "MCP aktivieren", enableDescription: "Dem Assistenten erlauben, diesen Server zu verwenden.", serverName: "Servername", serverNamePlaceholder: "Mein MCP-Server", transport: "Transport", streamableHttp: "Streamable HTTP", sse: "SSE", stdio: "Lokaler Prozess (stdio)", command: "Befehl", commandPlaceholder: "npx", arguments: "Argumente", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "Server-URL", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Bearer-Token", optional: "Optional", localStorageNotice: "Die Einstellungen werden nur in diesem Browser gespeichert und nicht an das Backend gesendet.", saved: "Gespeichert", saveSettings: "Einstellungen speichern" },
+  es: { description: "Configura un servidor de Model Context Protocol.", enable: "Activar MCP", enableDescription: "Permite que el asistente use este servidor.", serverName: "Nombre del servidor", serverNamePlaceholder: "Mi servidor MCP", transport: "Transporte", streamableHttp: "HTTP transmitible", sse: "SSE", stdio: "Proceso local (stdio)", command: "Comando", commandPlaceholder: "npx", arguments: "Argumentos", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "URL del servidor", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Token Bearer", optional: "Opcional", localStorageNotice: "La configuración se almacena solo en este navegador. Este panel no la envía al backend.", saved: "Guardado", saveSettings: "Guardar configuración" },
+  fr: { description: "Configurez un serveur Model Context Protocol.", enable: "Activer MCP", enableDescription: "Autoriser l'assistant à utiliser ce serveur.", serverName: "Nom du serveur", serverNamePlaceholder: "Mon serveur MCP", transport: "Transport", streamableHttp: "HTTP diffusible", sse: "SSE", stdio: "Processus local (stdio)", command: "Commande", commandPlaceholder: "npx", arguments: "Arguments", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "URL du serveur", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Jeton Bearer", optional: "Facultatif", localStorageNotice: "Les paramètres sont stockés uniquement dans ce navigateur. Ce panneau ne les envoie pas au backend.", saved: "Enregistré", saveSettings: "Enregistrer les paramètres" },
+  it: { description: "Configura un server Model Context Protocol.", enable: "Abilita MCP", enableDescription: "Consenti all'assistente di usare questo server.", serverName: "Nome del server", serverNamePlaceholder: "Il mio server MCP", transport: "Trasporto", streamableHttp: "HTTP trasmissibile", sse: "SSE", stdio: "Processo locale (stdio)", command: "Comando", commandPlaceholder: "npx", arguments: "Argomenti", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "URL del server", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Token Bearer", optional: "Facoltativo", localStorageNotice: "Le impostazioni sono salvate solo in questo browser. Questo pannello non le invia al backend.", saved: "Salvato", saveSettings: "Salva impostazioni" },
+  ja: { description: "Model Context Protocol サーバーを設定します。", enable: "MCPを有効にする", enableDescription: "アシスタントがこのサーバーを使用できるようにします。", serverName: "サーバー名", serverNamePlaceholder: "MCPサーバー", transport: "トランスポート", streamableHttp: "ストリーミングHTTP", sse: "SSE", stdio: "ローカルプロセス (stdio)", command: "コマンド", commandPlaceholder: "npx", arguments: "引数", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "サーバーURL", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Bearerトークン", optional: "任意", localStorageNotice: "設定はこのブラウザーにのみ保存されます。このパネルからバックエンドには送信されません。", saved: "保存しました", saveSettings: "設定を保存" },
+  ko: { description: "Model Context Protocol 서버를 구성합니다.", enable: "MCP 활성화", enableDescription: "어시스턴트가 이 서버를 사용하도록 허용합니다.", serverName: "서버 이름", serverNamePlaceholder: "내 MCP 서버", transport: "전송 방식", streamableHttp: "Streamable HTTP", sse: "SSE", stdio: "로컬 프로세스 (stdio)", command: "명령", commandPlaceholder: "npx", arguments: "인수", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "서버 URL", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Bearer 토큰", optional: "선택 사항", localStorageNotice: "설정은 이 브라우저에만 저장됩니다. 이 패널은 설정을 백엔드로 보내지 않습니다.", saved: "저장됨", saveSettings: "설정 저장" },
+  nl: { description: "Configureer een Model Context Protocol-server.", enable: "MCP inschakelen", enableDescription: "Geef de assistent toestemming deze server te gebruiken.", serverName: "Servernaam", serverNamePlaceholder: "Mijn MCP-server", transport: "Transport", streamableHttp: "Streamable HTTP", sse: "SSE", stdio: "Lokaal proces (stdio)", command: "Opdracht", commandPlaceholder: "npx", arguments: "Argumenten", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "Server-URL", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Bearer-token", optional: "Optioneel", localStorageNotice: "Instellingen worden alleen in deze browser opgeslagen. Dit paneel stuurt ze niet naar de backend.", saved: "Opgeslagen", saveSettings: "Instellingen opslaan" },
+  pl: { description: "Skonfiguruj serwer Model Context Protocol.", enable: "Włącz MCP", enableDescription: "Zezwól asystentowi korzystać z tego serwera.", serverName: "Nazwa serwera", serverNamePlaceholder: "Mój serwer MCP", transport: "Transport", streamableHttp: "Streamable HTTP", sse: "SSE", stdio: "Proces lokalny (stdio)", command: "Polecenie", commandPlaceholder: "npx", arguments: "Argumenty", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "URL serwera", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Token Bearer", optional: "Opcjonalne", localStorageNotice: "Ustawienia są przechowywane tylko w tej przeglądarce. Ten panel nie wysyła ich do backendu.", saved: "Zapisano", saveSettings: "Zapisz ustawienia" },
+  pt: { description: "Configure um servidor Model Context Protocol.", enable: "Ativar MCP", enableDescription: "Permitir que o assistente use este servidor.", serverName: "Nome do servidor", serverNamePlaceholder: "Meu servidor MCP", transport: "Transporte", streamableHttp: "HTTP transmitível", sse: "SSE", stdio: "Processo local (stdio)", command: "Comando", commandPlaceholder: "npx", arguments: "Argumentos", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "URL do servidor", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Token Bearer", optional: "Opcional", localStorageNotice: "As configurações são armazenadas apenas neste navegador. Este painel não as envia ao backend.", saved: "Salvo", saveSettings: "Salvar configurações" },
+  ru: { description: "Настройте сервер Model Context Protocol.", enable: "Включить MCP", enableDescription: "Разрешить помощнику использовать этот сервер.", serverName: "Имя сервера", serverNamePlaceholder: "Мой MCP-сервер", transport: "Транспорт", streamableHttp: "Потоковый HTTP", sse: "SSE", stdio: "Локальный процесс (stdio)", command: "Команда", commandPlaceholder: "npx", arguments: "Аргументы", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "URL сервера", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Bearer-токен", optional: "Необязательно", localStorageNotice: "Настройки хранятся только в этом браузере. Эта панель не отправляет их на сервер.", saved: "Сохранено", saveSettings: "Сохранить настройки" },
+  zh: { description: "配置 Model Context Protocol 服务器。", enable: "启用 MCP", enableDescription: "允许助手使用此服务器。", serverName: "服务器名称", serverNamePlaceholder: "我的 MCP 服务器", transport: "传输方式", streamableHttp: "可流式 HTTP", sse: "SSE", stdio: "本地进程 (stdio)", command: "命令", commandPlaceholder: "npx", arguments: "参数", argumentsPlaceholder: "-y @example/mcp-server", serverUrl: "服务器 URL", serverUrlPlaceholder: "https://example.com/mcp", bearerToken: "Bearer 令牌", optional: "可选", localStorageNotice: "设置仅存储在此浏览器中。此面板不会将设置发送到后端。", saved: "已保存", saveSettings: "保存设置" },
+};
+
+export const MCP_LABELS = MCP_UI_LABELS[CHATKIT_LOCALE] ?? MCP_UI_LABELS.en;
+
+export const MCP_RESET_LABELS: Record<string, string> = {
+  en: "Reset", de: "Zurücksetzen", es: "Restablecer", fr: "Réinitialiser", it: "Reimposta", ja: "リセット", ko: "초기화", nl: "Resetten", pl: "Resetuj", pt: "Redefinir", ru: "Сбросить", zh: "重置",
+};
+
 export const SIGN_OUT_LABELS: Record<string, string> = {
   en: "Sign out",
   de: "Abmelden",

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatKitPanel } from "./components/ChatKitPanel";
 import { KnowledgeBasePanel } from "./components/KnowledgeBasePanel";
+import { MCPPanel } from "./components/MCPPanel";
 import {
   CHATKIT_DELETE_ALL_URL,
   CHATKIT_API_URL,
@@ -40,6 +41,7 @@ export default function App() {
   );
   const [temporaryThreadId, setTemporaryThreadId] = useState<string | null>(null);
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
@@ -236,6 +238,17 @@ export default function App() {
             <div className="absolute right-0 z-10 mt-2 min-w-full rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
               <button
                 type="button"
+                onClick={() => {
+                  setMcpOpen(true);
+                  if (accountMenuRef.current) accountMenuRef.current.open = false;
+                }}
+                className="w-full whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <span aria-hidden="true" className="mr-2">⚙</span>
+                MCP
+              </button>
+              <button
+                type="button"
                 onClick={toggleTheme}
                 className="w-full whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                 aria-label={`${UI_LABELS.switchTo} ${theme === "dark" ? UI_LABELS.light : UI_LABELS.dark}`}
@@ -284,6 +297,12 @@ export default function App() {
         <KnowledgeBasePanel
           open={knowledgeBaseOpen}
           onClose={() => setKnowledgeBaseOpen(false)}
+        />
+        <MCPPanel
+          open={mcpOpen}
+          storageKey={session.user?.email?.trim().toLowerCase() ? `chatkit-mcp-settings:${session.user.email.trim().toLowerCase()}` : null}
+          configUrl={`${CHATKIT_API_URL.replace(/\/$/, "")}/mcp/config`}
+          onClose={() => setMcpOpen(false)}
         />
       </div>
     </main >

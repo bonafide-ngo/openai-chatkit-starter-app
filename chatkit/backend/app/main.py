@@ -6,6 +6,8 @@ import os
 import json
 import re
 import tempfile
+from contextlib import asynccontextmanager
+from typing import Any
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,11 +17,13 @@ from fastapi import File, FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 import httpx
+from agents.mcp import MCPServerManager
+from pydantic import BaseModel, Field
 
 from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
 from .memory_store import EphemeralStore
 from .export import build_docx, build_markdown, build_pdf, conversation_rows, export_text
-from .server import GENERATED_FILES, StarterChatServer
+from .server import GENERATED_FILES, StarterChatServer, configured_mcp_server
 from .vector_store import (
     configured_vector_store_ids,
     delete_vector_store_file,
@@ -31,7 +35,60 @@ from .vector_store import (
 from openai import AsyncOpenAI
 
 
-app = FastAPI(title="ChatKit Starter API")
+@asynccontextmanager
+async def app_lifespan(application: FastAPI):
+    application.state.mcp_configurations = {}
+    server = configured_mcp_server()
+    async with MCPServerManager([server] if server else [], strict=False) as mcp_manager:
+        application.state.mcp_manager = mcp_manager
+        yield
+
+
+app = FastAPI(title="ChatKit Starter API", lifespan=app_lifespan)
+
+
+class MCPConfiguration(BaseModel):
+    enabled: bool = False
+    name: str = Field(default="Configured MCP server", max_length=200)
+    transport: str = Field(default="streamable-http", pattern="^(streamable-http|sse|stdio)$")
+    url: str = Field(default="", max_length=2000)
+    command: str = Field(default="", max_length=200)
+    arguments: str = Field(default="", max_length=4000)
+    authToken: str = Field(default="", max_length=4000)
+
+
+def default_mcp_config() -> dict[str, Any]:
+    return {
+        "enabled": os.getenv("MCP_ENABLED", "false").strip().lower() == "true",
+        "name": os.getenv("MCP_SERVER_NAME", "Configured MCP server"),
+        "transport": os.getenv("MCP_TRANSPORT", "streamable-http"),
+        "url": os.getenv("MCP_SERVER_URL", ""),
+        "command": os.getenv("MCP_SERVER_COMMAND", ""),
+        "arguments": os.getenv("MCP_SERVER_ARGS", ""),
+        "authToken": "",
+    }
+
+
+@app.get("/chatkit/mcp/config")
+async def get_mcp_config(request: Request) -> dict[str, Any]:
+    config = request.app.state.mcp_configurations.get(request.state.user_id)
+    return config or default_mcp_config()
+
+
+@app.put("/chatkit/mcp/config")
+async def set_mcp_config(config: MCPConfiguration, request: Request) -> dict[str, str]:
+    if config.enabled and config.transport != "stdio" and not config.url.strip():
+        raise HTTPException(status_code=422, detail="MCP server URL is required when MCP is enabled.")
+    if config.enabled and config.transport == "stdio":
+        raise HTTPException(status_code=422, detail="stdio MCP servers must be configured by the server administrator.")
+    request.app.state.mcp_configurations[request.state.user_id] = config.model_dump()
+    return {"status": "saved"}
+
+
+@app.delete("/chatkit/mcp/config")
+async def reset_mcp_config(request: Request) -> dict[str, str]:
+    request.app.state.mcp_configurations.pop(request.state.user_id, None)
+    return {"status": "reset"}
 APP_TITLE = os.getenv("CHATKIT_APP_TITLE", "ChatKit")
 MAINTENANCE_MODE = os.getenv("CHATKIT_MAINTENANCE", "false").strip().lower() == "true"
 
@@ -91,7 +148,13 @@ async def require_authentication(request: Request, call_next):
 
 @app.get("/health")
 async def health() -> dict[str, bool | str]:
-    return {"status": "ok", "maintenance": MAINTENANCE_MODE}
+    mcp_manager = getattr(app.state, "mcp_manager", None)
+    return {
+        "status": "ok",
+        "maintenance": MAINTENANCE_MODE,
+        "mcp_configured": configured_mcp_server() is not None,
+        "mcp_active": bool(mcp_manager and mcp_manager.active_servers),
+    }
 
 
 def vector_store_client() -> AsyncOpenAI:
