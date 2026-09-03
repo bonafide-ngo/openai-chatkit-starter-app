@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatKitPanel } from "./components/ChatKitPanel";
 import { KnowledgeBasePanel } from "./components/KnowledgeBasePanel";
 import {
@@ -40,6 +40,7 @@ export default function App() {
   );
   const [temporaryThreadId, setTemporaryThreadId] = useState<string | null>(null);
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
     void Promise.all([
@@ -64,6 +65,18 @@ export default function App() {
     document.documentElement.dataset.colorScheme = theme;
     localStorage.setItem("theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    const closeAccountMenu = (event: Event) => {
+      const accountMenu = accountMenuRef.current;
+      if (accountMenu?.open && event.target instanceof Node && !accountMenu.contains(event.target)) {
+        accountMenu.open = false;
+      }
+    };
+
+    window.addEventListener("pointerdown", closeAccountMenu, true);
+    return () => window.removeEventListener("pointerdown", closeAccountMenu, true);
+  }, []);
 
   if (session === undefined || maintenance === undefined) {
     return <main className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-700">{(AUTH_GATE_LABELS[CHATKIT_LOCALE] ?? AUTH_GATE_LABELS.en).loading}</main>;
@@ -215,7 +228,7 @@ export default function App() {
             <option value="md">MD</option>
           </select>
 
-          <details className="relative">
+          <details ref={accountMenuRef} className="relative">
             <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
               <span className="max-w-52 truncate align-middle">{session.user?.email ?? "Account"}</span>
               <span aria-hidden="true" className="ml-2">⌄</span>
@@ -243,7 +256,14 @@ export default function App() {
         </div>
       </header>
 
-      <div className="relative min-h-0 flex-1 w-full">
+      <div
+        className="relative min-h-0 flex-1 w-full"
+        onMouseEnter={() => {
+          if (accountMenuRef.current?.open) {
+            accountMenuRef.current.open = false;
+          }
+        }}
+      >
         <ChatKitPanel
           theme={theme}
           mode="persistent"
