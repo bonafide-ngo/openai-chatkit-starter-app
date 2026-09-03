@@ -100,9 +100,53 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
 | `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
 | `CHATKIT_PUBLIC_BASE_URL` | none | Public HTTPS URL for previews and downloads. |
+| `MCP_ENABLED` | `false` | Enables the configured MCP server. MCP is optional. |
+| `MCP_TRANSPORT` | `streamable-http` | MCP transport: `streamable-http`, `sse`, or `stdio`. |
+| `MCP_SERVER_NAME` | `Configured MCP server` | Display name used by the assistant when identifying the MCP source. |
+| `MCP_SERVER_URL` | none | URL for Streamable HTTP or SSE MCP servers. |
+| `MCP_SERVER_COMMAND` | none | Executable for an administrator-configured stdio MCP server. |
+| `MCP_SERVER_ARGS` | none | Shell-like arguments for the stdio MCP command. |
+| `MCP_AUTH_TOKEN` | none | Optional server-side Bearer token for HTTP or SSE MCP connections. |
+| `MCP_REQUIRE_APPROVAL` | `never` | MCP tool approval policy: `always` or `never`. |
+| `MCP_CLIENT_TIMEOUT_SECONDS` | `30` | MCP client session timeout, with a minimum of 5 seconds. |
 
 Environment variables are loaded from `chatkit/.env.local`. Vite also uses
 this file for `VITE_*` variables.
+
+### Model Context Protocol (MCP)
+
+MCP is disabled by default. To configure one server, add its settings to
+`.env.local`, for example:
+
+```env
+MCP_ENABLED=true
+MCP_TRANSPORT=streamable-http
+MCP_SERVER_NAME=Guatemalia
+MCP_SERVER_URL=https://guatemalia.com/mcp
+MCP_AUTH_TOKEN=
+MCP_REQUIRE_APPROVAL=never
+MCP_CLIENT_TIMEOUT_SECONDS=30
+```
+
+The backend supports Streamable HTTP, SSE, and administrator-configured stdio
+servers through the OpenAI Agents SDK. Only one MCP server is active at a time.
+The backend connects it during the FastAPI lifespan and refreshes its tool list
+for subsequent requests. Changes to the server URL, transport, name, or other
+`.env` values require a backend restart. Tool additions or removals on the same
+server are picked up without restarting.
+
+When MCP is active, the assistant prefers its tools for requests within that
+server's scope. Web search, file search, code interpreter, and general model
+knowledge remain available for other requests. After using an MCP tool, the
+assistant is instructed to explain naturally that the relevant information came
+from the MCP server and to identify it by name.
+
+The account dropdown contains the `MCP` panel. It can save per-user HTTP/SSE
+settings through the authenticated backend configuration endpoint. The enable
+toggle is saved immediately; the `Save` button saves connection details. The
+`Reset` button removes the per-user override and restores the `.env` defaults.
+MCP tokens are kept server-side for `.env` configuration; stdio servers cannot
+be launched from browser-provided settings.
 
 ### Vector store
 
