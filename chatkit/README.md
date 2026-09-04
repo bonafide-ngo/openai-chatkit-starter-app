@@ -74,7 +74,15 @@ The backend records usage from completed OpenAI responses in the JSON file set b
 and model. `OPENAI_COST_*` values are prices per million tokens;
 `OPENAI_BILLING_FACTOR` is applied to each account's accumulated model costs.
 Responses with more than `OPENAI_LONG_CONTEXT_THRESHOLD` input tokens use the
-long-context rates.
+long-context rates. This includes every OpenAI response in an MCP tool loop, so
+the model turns used to call and process MCP tools are attributed to the
+authenticated user. Tokens or costs incurred internally by a separately hosted
+MCP server are not exposed by the MCP protocol and must be reported separately
+by that server if they also need to be billed here.
+File-search responses that use the configured vector stores follow the same
+per-user accounting. Vector-store storage, indexing, upload, listing, and
+deletion operations are account-level API operations without per-user token
+usage in their responses, so those costs are not included in this usage file.
 
 Auth.js settings are kept separately from the application settings. Copy
 `.env.auth.example` to `.env.auth.local` and put all `AUTH_*` values there. The Auth.js
