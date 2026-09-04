@@ -52,7 +52,18 @@ def public_base_url(context: dict[str, Any]) -> str | None:
 
 
 def upload_base_url(context: dict[str, Any]) -> str:
-    return public_base_url(context) or str(context["request"].base_url).rstrip("/")
+    configured_url = public_base_url(context)
+    if configured_url:
+        return configured_url
+
+    request = context["request"]
+    origin = request.headers.get("origin")
+    if origin:
+        parsed_origin = urlparse(origin)
+        if parsed_origin.scheme in {"http", "https"} and parsed_origin.netloc:
+            return origin.rstrip("/")
+
+    return str(request.base_url).rstrip("/")
 
 
 class MemoryAttachmentStore(AttachmentStore[dict[str, Any]]):

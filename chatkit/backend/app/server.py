@@ -42,6 +42,7 @@ from .attachment_store import (
     public_base_url,
 )
 from .memory_store import MemoryStore
+from .user_store import UserUsageStore
 
 
 MAX_THREADS = int(os.getenv("OPENAI_MAX_THREADS", "30"))
@@ -184,14 +185,28 @@ class StarterResponseStreamConverter(ResponseStreamConverter):
 
 
 class AnnotationCompatibleResult:
-    def __init__(self, result, converter: StarterResponseStreamConverter) -> None:
+    def __init__(
+        self,
+        result,
+        converter: StarterResponseStreamConverter,
+        usage_store: UserUsageStore,
+    ) -> None:
         self.result = result
         self.converter = converter
+        self.usage_store = usage_store
 
     async def stream_events(self):
         async for event in self.result.stream_events():
             if event.type == "raw_response_event":
                 response_event = event.data
+                if response_event.type == "response.completed":
+                    response = response_event.response
+                    if response.usage is not None:
+                        self.usage_store.record(
+                            self.converter.context["user_id"],
+                            response.model or MODEL,
+                            response.usage,
+                        )
             if (
                 event.type == "raw_response_event"
                 and event.data.type == "response.output_text.annotation.added"
@@ -285,7 +300,11 @@ class StarterChatServer(ChatKitServer[dict[str, Any]]):
         )
         async for event in stream_agent_response(
             agent_context,
-            AnnotationCompatibleResult(result, response_converter),
+            AnnotationCompatibleResult(
+                result,
+                response_converter,
+                UserUsageStore(),
+            ),
             converter=response_converter,
         ):
             yield event

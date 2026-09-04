@@ -67,6 +67,15 @@ Set `CHATKIT_MAINTENANCE=true` in `.env.local` to disable the complete system.
 The frontend shows only a maintenance message, while backend and Auth.js
 requests are rejected. Restart the development stack after changing this flag.
 
+### Usage billing
+
+The backend records usage from completed OpenAI responses in the JSON file set by
+`CHATKIT_USER_PATH`. Data is grouped under `months`, then by authenticated email
+and model. `OPENAI_COST_*` values are prices per million tokens;
+`OPENAI_BILLING_FACTOR` is applied to each account's accumulated model costs.
+Responses with more than `OPENAI_LONG_CONTEXT_THRESHOLD` input tokens use the
+long-context rates.
+
 Auth.js settings are kept separately from the application settings. Copy
 `.env.auth.example` to `.env.auth.local` and put all `AUTH_*` values there. The Auth.js
 launcher watches `.env.auth.local` and `auth/auth.config.local.json`, restarting
