@@ -90,6 +90,19 @@ class UserUsageStore:
             month["billing"] = sum(item["billing"] for item in month["accounts"].values())
             self._persist(data)
 
+    def monthly_billing(self) -> float:
+        month_key = datetime.now(timezone.utc).strftime("%Y-%m")
+        with _PROCESS_LOCK, self._file_lock():
+            month = self._load().get("months", {}).get(month_key, {})
+            try:
+                return max(float(month.get("billing", 0.0)), 0.0)
+            except (AttributeError, TypeError, ValueError):
+                return 0.0
+
+    def billing_limit_exceeded(self) -> bool:
+        limit = _number("OPENAI_BILLING_LIMIT", -1.0)
+        return limit >= 0 and self.monthly_billing() > limit
+
     @contextmanager
     def _file_lock(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)

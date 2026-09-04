@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import os
+from datetime import datetime
+from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Any, AsyncIterator
 from uuid import uuid4
@@ -27,7 +29,10 @@ from chatkit.server import ChatKitServer
 from chatkit.types import (
     Annotation,
     Attachment,
+    AssistantMessageItem,
     ImageAttachment,
+    ThreadItemAddedEvent,
+    ThreadItemDoneEvent,
     ThreadMetadata,
     ThreadStreamEvent,
     URLSource,
@@ -73,6 +78,40 @@ TEXT_FILE_MIME_TYPES = {
 GENERATED_FILE_DIR = Path("/tmp/chatkit-generated-files")
 GENERATED_FILE_DIR.mkdir(parents=True, exist_ok=True)
 GENERATED_FILES: dict[str, tuple[Path, str, str | None]] = {}
+BILLING_LIMIT_MESSAGE = {
+    "en": "This month's shared AI usage limit has been reached. Please increase your monthly plan to continue using AI conversations.",
+    "de": "Das gemeinsame monatliche KI-Nutzungslimit wurde erreicht. Bitte erhöhen Sie Ihren Monatsplan, um KI-Unterhaltungen fortzusetzen.",
+    "es": "Se ha alcanzado el límite mensual compartido de uso de IA. Aumenta tu plan mensual para continuar usando conversaciones de IA.",
+    "fr": "La limite mensuelle partagée d'utilisation de l'IA a été atteinte. Veuillez augmenter votre forfait mensuel pour continuer à utiliser les conversations IA.",
+    "it": "È stato raggiunto il limite mensile condiviso di utilizzo dell'IA. Aumenta il tuo piano mensile per continuare a usare le conversazioni con l'IA.",
+    "ja": "共有の月間AI利用上限に達しました。AIとの会話を続けるには、月額プランを上げてください。",
+    "ko": "공유 월간 AI 사용 한도에 도달했습니다. AI 대화를 계속하려면 월간 요금제를 업그레이드하세요.",
+    "nl": "De gedeelde maandelijkse limiet voor AI-gebruik is bereikt. Verhoog je maandabonnement om AI-gesprekken voort te zetten.",
+    "pl": "Osiągnięto wspólny miesięczny limit korzystania z AI. Zwiększ miesięczny plan, aby kontynuować rozmowy z AI.",
+    "pt": "O limite mensal compartilhado de uso de IA foi atingido. Aumente seu plano mensal para continuar usando conversas com IA.",
+    "ru": "Достигнут общий месячный лимит использования ИИ. Увеличьте свой месячный тариф, чтобы продолжить общение с ИИ.",
+    "zh": "已达到共享的每月 AI 使用限额。请升级您的月度套餐，以继续使用 AI 对话。",
+}
+SUPPORTED_LOCALES = frozenset(BILLING_LIMIT_MESSAGE)
+
+
+def request_locale(context: dict[str, Any]) -> str:
+    request = context.get("request")
+    if request is None:
+        return "en"
+
+    cookies = SimpleCookie(request.headers.get("cookie", ""))
+    cookie_locale = cookies.get("chatkit-language")
+    if cookie_locale is not None:
+        locale = cookie_locale.value.split("-", 1)[0].lower()
+        if locale in SUPPORTED_LOCALES:
+            return locale
+
+    for language in request.headers.get("accept-language", "").split(","):
+        locale = language.split(";", 1)[0].strip().split("-", 1)[0].lower()
+        if locale in SUPPORTED_LOCALES:
+            return locale
+    return "en"
 
 
 def delete_generated_files_for_thread(thread_id: str) -> None:
@@ -265,6 +304,22 @@ class StarterChatServer(ChatKitServer[dict[str, Any]]):
         item: UserMessageItem | None,
         context: dict[str, Any],
     ) -> AsyncIterator[ThreadStreamEvent]:
+
+        if UserUsageStore().billing_limit_exceeded():
+            notice = AssistantMessageItem(
+                id=uuid4().hex,
+                thread_id=thread.id,
+                content=[
+                    {
+                        "type": "output_text",
+                        "text": BILLING_LIMIT_MESSAGE[request_locale(context)],
+                    }
+                ],
+                created_at=datetime.now(),
+            )
+            yield ThreadItemAddedEvent(item=notice)
+            yield ThreadItemDoneEvent(item=notice)
+            return
 
         if item is not None and not thread.title:
             thread.title = make_thread_title(item)
