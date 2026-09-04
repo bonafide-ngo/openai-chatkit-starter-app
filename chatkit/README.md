@@ -19,7 +19,7 @@ of at least 32 characters in `.env.auth.local`. Configure at least one
 authentication method before signing in.
 
 ```bash
-npm install
+npm install --no-audit
 npm run dev
 ```
 
@@ -67,6 +67,15 @@ Set `CHATKIT_MAINTENANCE=true` in `.env.local` to disable the complete system.
 The frontend shows only a maintenance message, while backend and Auth.js
 requests are rejected. Restart the development stack after changing this flag.
 
+### Usage billing
+
+The backend records usage from completed OpenAI responses in the JSON file set by
+`CHATKIT_USER_PATH`. Data is grouped under `months`, then by authenticated email
+and model. `OPENAI_COST_*` values are prices per million tokens;
+`OPENAI_BILLING_FACTOR` is applied to each account's accumulated model costs.
+Responses with more than `OPENAI_LONG_CONTEXT_THRESHOLD` input tokens use the
+long-context rates.
+
 Auth.js settings are kept separately from the application settings. Copy
 `.env.auth.example` to `.env.auth.local` and put all `AUTH_*` values there. The Auth.js
 launcher watches `.env.auth.local` and `auth/auth.config.local.json`, restarting
@@ -91,12 +100,13 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | --- | --- | --- |
 | `OPENAI_API_KEY` | none | Backend authentication with OpenAI. |
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
+| `OPENAI_MAX_THREADS` | `100` | Maximum recent thread items sent to the assistant. |
 | `OPENAI_AGENT_INSTRUCTIONS` | built-in assistant prompt | System instructions passed to the assistant. |
 | `OPENAI_VECTOR_STORE_IDS` | none | Comma-separated OpenAI vector store IDs used by the assistant for file search. |
 | `CHATKIT_APP_TITLE` | `ChatKit` | Application title shown in exported documents. |
 | `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
 | `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_local_dev` | ChatKit domain key. |
-| `CHATKIT_STORE_PATH` | `.data/chatkit-store.json` | File-store location relative to `backend/`. |
+| `CHATKIT_STORE_PATH` | `../../data/chatkit-store.json` | File-store location relative to `backend/`. |
 | `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
 | `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
 | `CHATKIT_PUBLIC_BASE_URL` | none | Public HTTPS URL for previews and downloads. |
@@ -186,8 +196,8 @@ when the backend restarts.
 
 Persistent file storage is always used for normal chats. Full thread content,
 including questions and answers, is saved in the configured JSON store and
-survives backend restarts. The local `.data` directory is excluded from Git
-and is created on first write.
+survives backend restarts. The project-level `data` directory is excluded from
+Git and is created on first write.
 
 Use the `Temporary` toggle in the header to choose the conversation mode:
 

@@ -16,13 +16,13 @@ if [ ! -x ".venv/bin/python" ] || ! ".venv/bin/python" -c "import sys" >/dev/nul
   else
     echo "Creating virtual env in $PROJECT_ROOT/.venv ..."
   fi
-  python -m venv .venv
+  python3 -m venv .venv
 fi
 
 source .venv/bin/activate
 
 echo "Installing backend deps (editable) ..."
-python -m pip install -e . >/dev/null
+python -m pip install -e . --only-binary=:all: --disable-pip-version-check >/dev/null
 
 # Load app vars from .env.local and auth vars from .env.auth.local.
 ENV_FILE="$PROJECT_ROOT/../.env.local"

@@ -137,7 +137,12 @@ async def require_authentication(request: Request, call_next):
             })
     except httpx.HTTPError:
         return JSONResponse({"detail": "Authentication service unavailable"}, status_code=503)
-    auth_payload = auth_response.json()
+    try:
+        auth_payload = auth_response.json()
+    except ValueError:
+        auth_payload = None
+    if not isinstance(auth_payload, dict):
+        auth_payload = {}
     user = auth_payload.get("user")
     email = user.get("email") if isinstance(user, dict) else None
     if auth_response.status_code != 200 or not user or not isinstance(email, str) or not email.strip():
@@ -188,7 +193,7 @@ async def process_chatkit_request(
                     {"error": "The requested chat was unavailable and was removed from history."},
                     status_code=404,
                 )
-            raise
+        raise
 
     if isinstance(result, StreamingResult):
         return StreamingResponse(result, media_type="text/event-stream")

@@ -6,19 +6,23 @@ A production app would implement this using a persistant database.
 from __future__ import annotations
 
 from collections import defaultdict
+from contextlib import contextmanager
+import fcntl
 import json
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from threading import RLock
 
 from chatkit.store import NotFoundError, Store
 from chatkit.types import Attachment, Page, ThreadItem, ThreadMetadata
 from pydantic import TypeAdapter
 
 UPLOAD_DIR = Path("/tmp/chatkit-uploads")
-DEFAULT_STORE_PATH = Path(__file__).resolve().parents[1] / ".data" / "chatkit-store.json"
+DEFAULT_STORE_PATH = Path(__file__).resolve().parents[3] / "data" / "chatkit-store.json"
 THREAD_ITEM_ADAPTER = TypeAdapter(ThreadItem)
 ATTACHMENT_ADAPTER = TypeAdapter(Attachment)
+_PROCESS_LOCK = RLock()
 
 class MemoryStore(Store[dict]):
     def __init__(self, cleanup_thread_files=None):
@@ -28,165 +32,215 @@ class MemoryStore(Store[dict]):
         self.attachments: dict[str, Attachment] = {}
         self.cleanup_thread_files = cleanup_thread_files
         self.path = Path(os.getenv("CHATKIT_STORE_PATH", str(DEFAULT_STORE_PATH)))
+        self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
         self._load()
 
     async def load_thread(self, thread_id: str, context: dict) -> ThreadMetadata:
-        if not self._owns_thread(thread_id, context):
-            raise NotFoundError(f"Thread {thread_id} not found")
-        return self.threads[thread_id]
+        with self._read_lock():
+            if not self._owns_thread(thread_id, context):
+                raise NotFoundError(f"Thread {thread_id} not found")
+            return self.threads[thread_id]
 
     async def save_thread(self, thread: ThreadMetadata, context: dict) -> None:
-        metadata = ThreadMetadata.model_validate(
-            thread.model_dump(exclude={"items"})
-        )
-        owner_id = self._owner_id(context)
-        existing_owner = self.thread_owners.get(metadata.id)
-        if existing_owner is not None and existing_owner != owner_id:
-            raise NotFoundError(f"Thread {metadata.id} not found")
-        self.threads[metadata.id] = metadata
-        self.thread_owners[metadata.id] = owner_id
-        self._persist()
+        with self._mutation_lock():
+            metadata = ThreadMetadata.model_validate(
+                thread.model_dump(exclude={"items"})
+            )
+            owner_id = self._owner_id(context)
+            existing_owner = self.thread_owners.get(metadata.id)
+            if existing_owner is not None and existing_owner != owner_id:
+                raise NotFoundError(f"Thread {metadata.id} not found")
+            self.threads[metadata.id] = metadata
+            self.thread_owners[metadata.id] = owner_id
+            self._persist()
 
     async def load_threads(
         self, limit: int, after: str | None, order: str, context: dict
     ) -> Page[ThreadMetadata]:
-        threads = [
-            thread
-            for thread_id, thread in self.threads.items()
-            if self._owns_thread(thread_id, context)
-        ]
-        return self._paginate(
-            threads,
-            after,
-            limit,
-            order,
-            sort_key=lambda t: t.created_at,
-            cursor_key=lambda t: t.id,
-            page_type=Page[ThreadMetadata],
-        )
+        with self._read_lock():
+            threads = [
+                thread
+                for thread_id, thread in self.threads.items()
+                if self._owns_thread(thread_id, context)
+            ]
+            return self._paginate(
+                threads,
+                after,
+                limit,
+                order,
+                sort_key=lambda t: t.created_at,
+                cursor_key=lambda t: t.id,
+                page_type=Page[ThreadMetadata],
+            )
 
     async def load_thread_items(
         self, thread_id: str, after: str | None, limit: int, order: str, context: dict
     ) -> Page[ThreadItem]:
-        self._require_thread(thread_id, context)
-        items = self.items.get(thread_id, [])
-        return self._paginate(
-            items,
-            after,
-            limit,
-            order,
-            sort_key=lambda i: i.created_at,
-            cursor_key=lambda i: i.id,
-            page_type=Page[ThreadItem],
-        )
+        with self._read_lock():
+            self._require_thread(thread_id, context)
+            items = self.items.get(thread_id, [])
+            return self._paginate(
+                items,
+                after,
+                limit,
+                order,
+                sort_key=lambda i: i.created_at,
+                cursor_key=lambda i: i.id,
+                page_type=Page[ThreadItem],
+            )
 
     async def add_thread_item(
         self, thread_id: str, item: ThreadItem, context: dict
     ) -> None:
-        self._require_thread(thread_id, context)
-        self.items[thread_id].append(item)
-        self._persist()
+        with self._mutation_lock():
+            self._require_thread(thread_id, context)
+            self.items[thread_id].append(item)
+            self._persist()
 
     async def save_attachment(
         self,
         attachment: Attachment,
         context: dict,
     ) -> None:
-        self._require_thread(attachment.thread_id, context)
-        self.attachments[attachment.id] = attachment
-        self._persist()
+        with self._mutation_lock():
+            if attachment.thread_id is not None:
+                self._require_thread(attachment.thread_id, context)
+            self.attachments[attachment.id] = attachment
+            self._persist()
 
     async def load_attachment(
         self,
         attachment_id: str,
         context: dict,
     ) -> Attachment:
-        attachment = self.attachments.get(attachment_id)
-        if attachment is None or not self._owns_thread(attachment.thread_id, context):
-            raise NotFoundError(
-                f"Attachment {attachment_id} not found"
-            )
-
-        return attachment
+        with self._read_lock():
+            attachment = self.attachments.get(attachment_id)
+            if attachment is None:
+                raise NotFoundError(f"Attachment {attachment_id} not found")
+            if attachment.thread_id is not None and not self._owns_thread(
+                attachment.thread_id, context
+            ):
+                raise NotFoundError(f"Attachment {attachment_id} not found")
+            return attachment
 
     async def delete_attachment(
         self,
         attachment_id: str,
         context: dict,
     ) -> None:
-        attachment = self.attachments.get(attachment_id)
-        if attachment is not None and not self._owns_thread(attachment.thread_id, context):
-            raise NotFoundError(f"Attachment {attachment_id} not found")
-        self.attachments.pop(attachment_id, None)
-        self._persist()
+        with self._mutation_lock():
+            attachment = self.attachments.get(attachment_id)
+            if (
+                attachment is not None
+                and attachment.thread_id is not None
+                and not self._owns_thread(attachment.thread_id, context)
+            ):
+                raise NotFoundError(f"Attachment {attachment_id} not found")
+            self.attachments.pop(attachment_id, None)
+            self._persist()
 
     async def save_item(self, thread_id: str, item: ThreadItem, context: dict) -> None:
-        self._require_thread(thread_id, context)
-        items = self.items[thread_id]
-        for idx, existing in enumerate(items):
-            if existing.id == item.id:
-                items[idx] = item
-                self._persist()
-                return
-        items.append(item)
-        self._persist()
+        with self._mutation_lock():
+            self._require_thread(thread_id, context)
+            items = self.items[thread_id]
+            for idx, existing in enumerate(items):
+                if existing.id == item.id:
+                    items[idx] = item
+                    self._persist()
+                    return
+            items.append(item)
+            self._persist()
 
     async def load_item(
         self, thread_id: str, item_id: str, context: dict
     ) -> ThreadItem:
-        self._require_thread(thread_id, context)
-        for item in self.items.get(thread_id, []):
-            if item.id == item_id:
-                return item
-        raise NotFoundError(f"Item {item_id} not found in thread {thread_id}")
+        with self._read_lock():
+            self._require_thread(thread_id, context)
+            for item in self.items.get(thread_id, []):
+                if item.id == item_id:
+                    return item
+            raise NotFoundError(f"Item {item_id} not found in thread {thread_id}")
 
     async def delete_thread(self, thread_id: str, context: dict) -> None:
-        self._require_thread(thread_id, context)
-        self.threads.pop(thread_id, None)
-        self.thread_owners.pop(thread_id, None)
-        self.items.pop(thread_id, None)
-
-        attachment_ids = [
-            attachment_id
-            for attachment_id, attachment in self.attachments.items()
-            if attachment.thread_id == thread_id
-        ]
-
-        for attachment_id in attachment_ids:
-            self.attachments.pop(attachment_id, None)
-            (UPLOAD_DIR / attachment_id).unlink(missing_ok=True)
-        if self.cleanup_thread_files is not None:
-            self.cleanup_thread_files(thread_id)
-        self._persist()
-
-    async def delete_all(self, context: dict) -> None:
-        owned_thread_ids = [
-            thread_id for thread_id in self.threads if self._owns_thread(thread_id, context)
-        ]
-        for thread_id in owned_thread_ids:
-            if self.cleanup_thread_files is not None:
-                self.cleanup_thread_files(thread_id)
-
-        for thread_id in owned_thread_ids:
+        with self._mutation_lock():
+            self._require_thread(thread_id, context)
             self.threads.pop(thread_id, None)
             self.thread_owners.pop(thread_id, None)
             self.items.pop(thread_id, None)
-        for attachment_id, attachment in list(self.attachments.items()):
-            if attachment.thread_id in owned_thread_ids:
+
+            attachment_ids = [
+                attachment_id
+                for attachment_id, attachment in self.attachments.items()
+                if attachment.thread_id == thread_id
+            ]
+
+            for attachment_id in attachment_ids:
                 self.attachments.pop(attachment_id, None)
                 (UPLOAD_DIR / attachment_id).unlink(missing_ok=True)
-        self._persist()
+            if self.cleanup_thread_files is not None:
+                self.cleanup_thread_files(thread_id)
+            self._persist()
+
+    async def delete_all(self, context: dict) -> None:
+        with self._mutation_lock():
+            owned_thread_ids = [
+                thread_id for thread_id in self.threads if self._owns_thread(thread_id, context)
+            ]
+            for thread_id in owned_thread_ids:
+                if self.cleanup_thread_files is not None:
+                    self.cleanup_thread_files(thread_id)
+
+            for thread_id in owned_thread_ids:
+                self.threads.pop(thread_id, None)
+                self.thread_owners.pop(thread_id, None)
+                self.items.pop(thread_id, None)
+            for attachment_id, attachment in list(self.attachments.items()):
+                if attachment.thread_id in owned_thread_ids:
+                    self.attachments.pop(attachment_id, None)
+                    (UPLOAD_DIR / attachment_id).unlink(missing_ok=True)
+            self._persist()
 
     async def delete_thread_item(
         self, thread_id: str, item_id: str, context: dict
     ) -> None:
-        self._require_thread(thread_id, context)
-        self.items[thread_id] = [
-            item for item in self.items.get(thread_id, []) if item.id != item_id
-        ]
-        self._persist()
+        with self._mutation_lock():
+            self._require_thread(thread_id, context)
+            self.items[thread_id] = [
+                item for item in self.items.get(thread_id, []) if item.id != item_id
+            ]
+            self._persist()
+
+    @contextmanager
+    def _mutation_lock(self):
+        with _PROCESS_LOCK:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.lock_path.open("a+", encoding="utf-8") as lock_file:
+                self.lock_path.chmod(0o600)
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    self._load()
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    @contextmanager
+    def _read_lock(self):
+        with _PROCESS_LOCK:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.lock_path.open("a+", encoding="utf-8") as lock_file:
+                self.lock_path.chmod(0o600)
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
+                try:
+                    self._load()
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _load(self) -> None:
+        self.threads = {}
+        self.thread_owners = {}
+        self.items = defaultdict(list)
+        self.attachments = {}
         if not self.path.is_file():
             return
 
@@ -233,18 +287,31 @@ class MemoryStore(Store[dict]):
                 for attachment_id, attachment in self.attachments.items()
             },
         }
-        with NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=self.path.parent,
-            prefix=f".{self.path.name}.",
-            delete=False,
-        ) as temporary_file:
-            json.dump(data, temporary_file, ensure_ascii=True, separators=(",", ":"))
-            temporary_path = Path(temporary_file.name)
-        temporary_path.chmod(0o600)
-        temporary_path.replace(self.path)
-        self.path.chmod(0o600)
+        temporary_path: Path | None = None
+        try:
+            with NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.path.parent,
+                prefix=f".{self.path.name}.",
+                delete=False,
+            ) as temporary_file:
+                temporary_path = Path(temporary_file.name)
+                json.dump(data, temporary_file, ensure_ascii=True, separators=(",", ":"))
+                temporary_file.flush()
+                os.fsync(temporary_file.fileno())
+            temporary_path.chmod(0o600)
+            temporary_path.replace(self.path)
+            temporary_path = None
+            self.path.chmod(0o600)
+            directory_fd = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
 
     @staticmethod
     def _owner_id(context: dict) -> str:
@@ -294,6 +361,14 @@ class EphemeralStore(MemoryStore):
 
     def _persist(self) -> None:
         return
+
+    @contextmanager
+    def _mutation_lock(self):
+        yield
+
+    @contextmanager
+    def _read_lock(self):
+        yield
 
     async def load_threads(
         self, limit: int, after: str | None, order: str, context: dict

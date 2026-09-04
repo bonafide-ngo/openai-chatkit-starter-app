@@ -35,5 +35,11 @@
     "tailwindcss": "^4",
     "typescript": "^5.6.3",
     "vite": "^7.1.9"
+  },
+  "allowScripts": {
+    "@tailwindcss/oxide@4.1.14": true,
+    "@swc/core@1.15.3": true,
+    "esbuild@0.25.12": true,
+    "fsevents@2.3.3": true
   }
 }
