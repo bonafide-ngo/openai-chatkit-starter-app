@@ -91,6 +91,7 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | --- | --- | --- |
 | `OPENAI_API_KEY` | none | Backend authentication with OpenAI. |
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
+| `OPENAI_MAX_THREADS` | `100` | Maximum recent thread items sent to the assistant. |
 | `OPENAI_AGENT_INSTRUCTIONS` | built-in assistant prompt | System instructions passed to the assistant. |
 | `OPENAI_VECTOR_STORE_IDS` | none | Comma-separated OpenAI vector store IDs used by the assistant for file search. |
 | `CHATKIT_APP_TITLE` | `ChatKit` | Application title shown in exported documents. |

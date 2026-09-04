@@ -44,7 +44,7 @@ from .attachment_store import (
 from .memory_store import MemoryStore
 
 
-MAX_RECENT_ITEMS = 30
+MAX_THREADS = int(os.getenv("OPENAI_MAX_THREADS", "30"))
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
 AGENT_INSTRUCTIONS = os.getenv(
     "OPENAI_AGENT_INSTRUCTIONS",
@@ -258,7 +258,7 @@ class StarterChatServer(ChatKitServer[dict[str, Any]]):
         items_page = await self.store.load_thread_items(
             thread.id,
             after=None,
-            limit=MAX_RECENT_ITEMS,
+            limit=MAX_THREADS,
             order="desc",
             context=context,
         )
