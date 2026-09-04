@@ -3,10 +3,10 @@
   "private": true,
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --names auth,backend,frontend \"npm run auth\" \"npm run backend\" \"npm run frontend-dev\"",
-    "frontend-dev": "npm --prefix frontend install && bash ./backend/scripts/wait-for-backend.sh && npm --prefix frontend run dev",
+    "frontend-dev": "cd frontend && npm install --no-audit --no-fund && cd .. && bash ./backend/scripts/wait-for-backend.sh && cd frontend && npm run dev",
     "build": "npm run frontend-build",
     "auth": "node auth/start.mjs",
-    "frontend-build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "frontend-build": "cd frontend && npm install --no-audit --no-fund && npm run build",
     "backend": "./backend/scripts/run.sh"
   },
   "devDependencies": {

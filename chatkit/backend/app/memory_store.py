@@ -16,7 +16,7 @@ from chatkit.types import Attachment, Page, ThreadItem, ThreadMetadata
 from pydantic import TypeAdapter
 
 UPLOAD_DIR = Path("/tmp/chatkit-uploads")
-DEFAULT_STORE_PATH = Path(__file__).resolve().parents[1] / ".data" / "chatkit-store.json"
+DEFAULT_STORE_PATH = Path(__file__).resolve().parents[3] / "data" / "chatkit-store.json"
 THREAD_ITEM_ADAPTER = TypeAdapter(ThreadItem)
 ATTACHMENT_ADAPTER = TypeAdapter(Attachment)
 

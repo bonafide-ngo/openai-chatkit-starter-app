@@ -19,7 +19,7 @@ of at least 32 characters in `.env.auth.local`. Configure at least one
 authentication method before signing in.
 
 ```bash
-npm install
+npm install --no-audit
 npm run dev
 ```
 
@@ -96,7 +96,7 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | `CHATKIT_APP_TITLE` | `ChatKit` | Application title shown in exported documents. |
 | `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
 | `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_local_dev` | ChatKit domain key. |
-| `CHATKIT_STORE_PATH` | `.data/chatkit-store.json` | File-store location relative to `backend/`. |
+| `CHATKIT_STORE_PATH` | `../../data/chatkit-store.json` | File-store location relative to `backend/`. |
 | `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
 | `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
 | `CHATKIT_PUBLIC_BASE_URL` | none | Public HTTPS URL for previews and downloads. |
@@ -142,8 +142,8 @@ when the backend restarts.
 
 Persistent file storage is always used for normal chats. Full thread content,
 including questions and answers, is saved in the configured JSON store and
-survives backend restarts. The local `.data` directory is excluded from Git
-and is created on first write.
+survives backend restarts. The project-level `data` directory is excluded from
+Git and is created on first write.
 
 Use the `Temporary` toggle in the header to choose the conversation mode:
 
