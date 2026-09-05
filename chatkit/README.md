@@ -2,7 +2,8 @@
 
 React and Vite frontend paired with a FastAPI backend. The backend uses the
 OpenAI Agents SDK with ChatKit for streaming responses, web search, code
-interpreter sessions, and file analysis.
+interpreter sessions, file analysis, hosted file search, and optional Model
+Context Protocol (MCP) tools. Node.js and Python 3.11 or newer are required.
 
 ## Quick Start
 
@@ -30,6 +31,10 @@ before starting Vite.
 The backend startup script creates `backend/.venv` and installs dependencies.
 Set `OPENAI_API_KEY` before starting the app, or place it in
 `chatkit/.env.local`.
+
+The development command runs three processes: Auth.js on port `3001`, FastAPI
+on port `8000`, and Vite on port `3000`. The backend script loads application
+settings from `.env.local` and authentication settings from `.env.auth.local`.
 
 ### Authentication
 
@@ -108,13 +113,20 @@ Copy `.env.example` to `.env.local` and update the values as needed:
 | --- | --- | --- |
 | `OPENAI_API_KEY` | none | Backend authentication with OpenAI. |
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Agent model name. |
-| `OPENAI_MAX_THREADS` | `100` | Maximum recent thread items sent to the assistant. |
+| `OPENAI_MAX_THREADS` | `30` | Maximum recent thread items sent to the assistant. The example file sets this to `100`. |
+| `OPENAI_LONG_CONTEXT_THRESHOLD` | `200000` | Input-token threshold that selects long-context billing rates. |
 | `OPENAI_AGENT_INSTRUCTIONS` | built-in assistant prompt | System instructions passed to the assistant. |
 | `OPENAI_VECTOR_STORE_IDS` | none | Comma-separated OpenAI vector store IDs used by the assistant for file search. |
+| `OPENAI_BILLING_FACTOR` | `1` | Multiplier applied to each account's calculated model cost. |
+| `OPENAI_BILLING_LIMIT` | none | Shared monthly billing limit; omit or use a negative value to disable enforcement. |
+| `OPENAI_BILLING_CURRENCY` | `USD` | Currency label shown in the usage panel. |
+| `OPENAI_COST_*` | built-in rates | Per-million-token rates for short/long, cached/uncached input and output. |
 | `CHATKIT_APP_TITLE` | `ChatKit` | Application title shown in exported documents. |
-| `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. |
+| `CHATKIT_MAINTENANCE` | `false` | Rejects application and authentication requests while showing the maintenance screen. |
+| `VITE_CHATKIT_API_URL` | `/chatkit` | Frontend ChatKit API URL. Loopback values use the Vite proxy. |
 | `VITE_CHATKIT_API_DOMAIN_KEY` | `domain_pk_local_dev` | ChatKit domain key. |
 | `CHATKIT_STORE_PATH` | `../../data/chatkit-store.json` | File-store location relative to `backend/`. |
+| `CHATKIT_USER_PATH` | `../../data/chatkit-user.json` | Usage and billing-store location relative to `backend/`. |
 | `CHATKIT_MAX_ATTACHMENT_BYTES` | `26214400` | Maximum upload size. |
 | `CHATKIT_ALLOWED_ORIGINS` | local origins and ChatKit CDN | CORS allowlist. |
 | `CHATKIT_PUBLIC_BASE_URL` | none | Public HTTPS URL for previews and downloads. |
@@ -163,8 +175,11 @@ The account dropdown contains the `MCP` panel. It can save per-user HTTP/SSE
 settings through the authenticated backend configuration endpoint. The enable
 toggle is saved immediately; the `Save` button saves connection details. The
 `Reset` button removes the per-user override and restores the `.env` defaults.
-MCP tokens are kept server-side for `.env` configuration; stdio servers cannot
-be launched from browser-provided settings.
+Administrator `.env` configuration keeps the MCP token on the server. Settings
+entered in the panel are stored in that browser's local storage and sent to the
+authenticated backend, so use the panel only for users who are trusted to
+configure MCP credentials. Stdio servers cannot be launched from browser-
+provided settings and must be configured by the server administrator.
 
 ### Vector store
 
@@ -184,7 +199,8 @@ Use the upload button beside the composer to attach a file to the active
 conversation only. Use the `Files` button to choose a configured vector store
 and upload a file to its knowledge base. The knowledge-base upload waits for
 indexing to finish. Uploading another file with the same name to the same store
-replaces and reindexes the previous file after the new version succeeds.
+replaces and reindexes the previous file after the new version succeeds. Files
+are uploaded sequentially so progress is deterministic.
 
 The file list in the same panel supports deleting individual files or all files
 from the selected store. Deletion removes the vector-store association and then
