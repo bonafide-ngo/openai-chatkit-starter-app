@@ -234,6 +234,10 @@ export const SIGN_OUT_LABELS: Record<string, string> = {
   zh: "退出登录",
 };
 
+export const MENU_LABELS: Record<string, string> = {
+  en: "Menu", de: "Menü", es: "Menú", fr: "Menu", it: "Menu", ja: "メニュー", ko: "메뉴", nl: "Menu", pl: "Menu", pt: "Menu", ru: "Меню", zh: "菜单",
+};
+
 export const AUTH_GATE_LABELS: Record<string, { loading: string; description: string; signIn: string; maintenance: string }> = {
   en: { loading: "Loading...", description: "Sign in with an authorised account to continue.", signIn: "Sign in", maintenance: "The system is temporarily unavailable for maintenance." },
   de: { loading: "Wird geladen...", description: "Melden Sie sich mit einem autorisierten Konto an, um fortzufahren.", signIn: "Anmelden", maintenance: "Das System ist wegen Wartungsarbeiten vorübergehend nicht verfügbar." },
