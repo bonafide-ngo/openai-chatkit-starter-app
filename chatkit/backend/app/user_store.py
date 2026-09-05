@@ -112,7 +112,11 @@ class UserUsageStore:
                     model_data.get("tokens", {}).get("total", 0)
                     for model_data in account_data.get("models", {}).values()
                 )
-                monthly_tokens.append({"month": key, "tokens": max(int(total_tokens), 0)})
+                monthly_tokens.append({
+                    "month": key,
+                    "tokens": max(int(total_tokens), 0),
+                    "billing": _safe_float(account_data.get("billing")),
+                })
 
             current_billing = _safe_float(current_month.get("billing"))
             billing_limit = _number("OPENAI_BILLING_LIMIT", -1.0)
@@ -126,6 +130,7 @@ class UserUsageStore:
                 "billing": current_billing,
                 "billing_limit": billing_limit if billing_limit >= 0 else None,
                 "billing_percentage": billing_percentage,
+                "billing_currency": os.getenv("OPENAI_BILLING_CURRENCY", "USD").strip() or "USD",
                 "tokens": monthly_tokens,
                 "current_user_tokens": max(
                     sum(

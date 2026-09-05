@@ -10,6 +10,9 @@ from contextlib import asynccontextmanager
 from typing import Any
 from datetime import datetime, timezone
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env.local")
 
 from chatkit.server import StreamingResult
 from chatkit.store import NotFoundError
