@@ -99,6 +99,43 @@ class UserUsageStore:
             except (AttributeError, TypeError, ValueError):
                 return 0.0
 
+    def usage_snapshot(self, email: str) -> dict[str, Any]:
+        month_key = datetime.now(timezone.utc).strftime("%Y-%m")
+        with _PROCESS_LOCK, self._file_lock():
+            months = self._load().get("months", {})
+            current_month = months.get(month_key, {})
+            account = current_month.get("accounts", {}).get(email.strip().casefold(), {})
+            monthly_tokens = []
+            for key, month in sorted(months.items()):
+                account_data = month.get("accounts", {}).get(email.strip().casefold(), {})
+                total_tokens = sum(
+                    model_data.get("tokens", {}).get("total", 0)
+                    for model_data in account_data.get("models", {}).values()
+                )
+                monthly_tokens.append({"month": key, "tokens": max(int(total_tokens), 0)})
+
+            current_billing = _safe_float(current_month.get("billing"))
+            billing_limit = _number("OPENAI_BILLING_LIMIT", -1.0)
+            billing_percentage = (
+                max(current_billing / billing_limit * 100, 0.0)
+                if billing_limit > 0
+                else 0.0
+            )
+            return {
+                "month": month_key,
+                "billing": current_billing,
+                "billing_limit": billing_limit if billing_limit >= 0 else None,
+                "billing_percentage": billing_percentage,
+                "tokens": monthly_tokens,
+                "current_user_tokens": max(
+                    sum(
+                        model_data.get("tokens", {}).get("total", 0)
+                        for model_data in account.get("models", {}).values()
+                    ),
+                    0,
+                ),
+            }
+
     def billing_limit_exceeded(self) -> bool:
         limit = _number("OPENAI_BILLING_LIMIT", -1.0)
         return limit >= 0 and self.monthly_billing() > limit
@@ -165,6 +202,13 @@ def _nonnegative_int(value: Any) -> int:
         return max(int(value or 0), 0)
     except (TypeError, ValueError, OverflowError):
         return 0
+
+
+def _safe_float(value: Any) -> float:
+    try:
+        return max(float(value or 0), 0.0)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
 
 
 def _cost_counts() -> dict[str, float]:

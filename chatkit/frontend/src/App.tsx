@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChatKitPanel } from "./components/ChatKitPanel";
 import { KnowledgeBasePanel } from "./components/KnowledgeBasePanel";
 import { MCPPanel } from "./components/MCPPanel";
+import { UsagePanel } from "./components/UsagePanel";
 import {
   CHATKIT_DELETE_ALL_URL,
   CHATKIT_API_URL,
@@ -15,6 +16,7 @@ import {
   setChatkitLocale,
   SIGN_OUT_LABELS,
   UI_LABELS,
+  USAGE_LABELS,
 } from "./lib/config";
 
 type Theme = "light" | "dark";
@@ -42,6 +44,7 @@ export default function App() {
   const [temporaryThreadId, setTemporaryThreadId] = useState<string | null>(null);
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [usageOpen, setUsageOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
@@ -239,6 +242,17 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
+                  setUsageOpen(true);
+                  if (accountMenuRef.current) accountMenuRef.current.open = false;
+                }}
+                className="w-full whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <span aria-hidden="true" className="mr-2">▥</span>
+                {USAGE_LABELS.usage}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setMcpOpen(true);
                   if (accountMenuRef.current) accountMenuRef.current.open = false;
                 }}
@@ -303,6 +317,11 @@ export default function App() {
           storageKey={session.user?.email?.trim().toLowerCase() ? `chatkit-mcp-settings:${session.user.email.trim().toLowerCase()}` : null}
           configUrl={`${CHATKIT_API_URL.replace(/\/$/, "")}/mcp/config`}
           onClose={() => setMcpOpen(false)}
+        />
+        <UsagePanel
+          open={usageOpen}
+          configUrl={`${CHATKIT_API_URL.replace(/\/$/, "")}/usage`}
+          onClose={() => setUsageOpen(false)}
         />
       </div>
     </main >

@@ -24,6 +24,7 @@ from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
 from .memory_store import EphemeralStore
 from .export import build_docx, build_markdown, build_pdf, conversation_rows, export_text
 from .server import GENERATED_FILES, StarterChatServer, configured_mcp_server
+from .user_store import UserUsageStore
 from .vector_store import (
     configured_vector_store_ids,
     delete_vector_store_file,
@@ -160,6 +161,11 @@ async def health() -> dict[str, bool | str]:
         "mcp_configured": configured_mcp_server() is not None,
         "mcp_active": bool(mcp_manager and mcp_manager.active_servers),
     }
+
+
+@app.get("/chatkit/usage")
+async def get_usage(request: Request) -> dict[str, Any]:
+    return UserUsageStore().usage_snapshot(request.state.user_id)
 
 
 def vector_store_client() -> AsyncOpenAI:
