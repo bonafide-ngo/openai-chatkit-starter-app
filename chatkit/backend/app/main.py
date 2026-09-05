@@ -238,7 +238,12 @@ async def export_thread(thread_id: str, extension: str, request: Request, locale
     )
     labels = export_text(locale)
     title = thread.title or labels["chat_export"]
-    rows = conversation_rows(thread, items_page.data, locale)
+    rows = conversation_rows(
+        thread,
+        items_page.data,
+        locale,
+        user_email=request.state.user_id,
+    )
     exported_at = datetime.now(timezone.utc)
     if extension == "pdf":
         output = build_pdf(APP_TITLE, title, rows, exported_at, locale)

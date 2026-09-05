@@ -82,14 +82,19 @@ def content_segments(text: str) -> list[tuple[str, bool]]:
     return [(content, is_code) for content, is_code in segments if content.strip()]
 
 
-def conversation_rows(thread: Any, items: list[Any], locale: str = "en") -> list[tuple[str, str]]:
+def conversation_rows(
+    thread: Any,
+    items: list[Any],
+    locale: str = "en",
+    user_email: str | None = None,
+) -> list[tuple[str, str]]:
     labels = export_text(locale)
     rows = []
     for item in items:
         text = item_text(item)
         if text:
             role = item_role(item)
-            role = labels.get(role.lower(), role)
+            role = user_email if role == "User" and user_email else labels.get(role.lower(), role)
             rows.append((role, text))
     return rows
 

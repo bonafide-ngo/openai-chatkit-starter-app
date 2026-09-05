@@ -213,6 +213,8 @@ When a conversation is active, use the `Export` menu in the header to choose
 `PDF`, `DOCX`, `MD`, or plain `TXT` and download the complete stored conversation. Exports include
 the configured application title, chat title, export date/time, and full thread
 history, including messages older than the context window used by the assistant.
+Questions sent by the authenticated user are labeled with that user's email
+instead of the generic `User` label.
 Temporary conversations can be exported while they are active, but are lost
 when the backend restarts.
 
