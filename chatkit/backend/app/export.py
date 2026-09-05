@@ -240,3 +240,18 @@ def build_markdown(app_title: str, title: str, rows: list[tuple[str, str]], expo
     output = BytesIO("\n".join(markdown).encode("utf-8"))
     output.seek(0)
     return output
+
+
+def build_text(app_title: str, title: str, rows: list[tuple[str, str]], exported_at: datetime, locale: str = "en") -> BytesIO:
+    labels = export_text(locale)
+    text = [
+        app_title,
+        f"{labels['title']}: {title}",
+        f"{labels['exported']}: {exported_at.strftime('%Y-%m-%d %H:%M UTC')}",
+        "",
+    ]
+    for role, content in rows:
+        text.extend([role, content, ""])
+    output = BytesIO("\n".join(text).encode("utf-8"))
+    output.seek(0)
+    return output

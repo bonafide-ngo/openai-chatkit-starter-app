@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 
 from .attachment_store import MAX_ATTACHMENT_BYTES, UPLOAD_DIR
 from .memory_store import EphemeralStore
-from .export import build_docx, build_markdown, build_pdf, conversation_rows, export_text
+from .export import build_docx, build_markdown, build_pdf, build_text, conversation_rows, export_text
 from .server import GENERATED_FILES, StarterChatServer, configured_mcp_server
 from .user_store import UserUsageStore
 from .vector_store import (
@@ -246,6 +246,9 @@ async def export_thread(thread_id: str, extension: str, request: Request, locale
     elif extension == "docx":
         output = build_docx(APP_TITLE, title, rows, exported_at, locale)
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif extension == "txt":
+        output = build_text(APP_TITLE, title, rows, exported_at, locale)
+        media_type = "text/plain; charset=utf-8"
     else:
         output = build_markdown(APP_TITLE, title, rows, exported_at, locale)
         media_type = "text/markdown; charset=utf-8"
@@ -259,14 +262,14 @@ async def export_thread(thread_id: str, extension: str, request: Request, locale
 
 @app.get("/chatkit/threads/{thread_id}/export/{extension}")
 async def export_persistent_thread(thread_id: str, extension: str, request: Request, locale: str = "en") -> Response:
-    if extension not in {"pdf", "docx", "md"}:
+    if extension not in {"pdf", "docx", "md", "txt"}:
         raise HTTPException(status_code=400, detail="Unsupported export format")
     return await export_thread(thread_id, extension, request, locale)
 
 
 @app.get("/chatkit/temporary/threads/{thread_id}/export/{extension}")
 async def export_temporary_thread(thread_id: str, extension: str, request: Request, locale: str = "en") -> Response:
-    if extension not in {"pdf", "docx", "md"}:
+    if extension not in {"pdf", "docx", "md", "txt"}:
         raise HTTPException(status_code=400, detail="Unsupported export format")
     return await export_thread(thread_id, extension, request, locale)
 

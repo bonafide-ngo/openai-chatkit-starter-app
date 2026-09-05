@@ -14,7 +14,7 @@ analysis, hosted file search, and optional MCP tools.
 - Optional Model Context Protocol (MCP) integration
 - Automatic thread titles
 - Light and dark themes
-- PDF, DOCX, and Markdown conversation exports
+- PDF, DOCX, Markdown, and plain TXT conversation exports
 - Per-user usage and billing dashboard
 - Persistent local chat history
 - Temporary chats without history

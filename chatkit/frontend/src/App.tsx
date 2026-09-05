@@ -153,7 +153,7 @@ export default function App() {
 
   const activeThreadId = chatMode === "persistent" ? persistentThreadId : temporaryThreadId;
 
-  const exportThread = async (format: "pdf" | "docx" | "md") => {
+  const exportThread = async (format: "pdf" | "docx" | "md" | "txt") => {
     if (!activeThreadId) return;
     const baseUrl = chatMode === "temporary" ? CHATKIT_TEMPORARY_API_URL : CHATKIT_API_URL;
     const response = await fetch(`${baseUrl}/threads/${encodeURIComponent(activeThreadId)}/export/${format}?locale=${CHATKIT_LOCALE}`);
@@ -221,7 +221,7 @@ export default function App() {
           <select
             defaultValue=""
             onChange={(event) => {
-              const format = event.target.value as "pdf" | "docx" | "md" | "";
+              const format = event.target.value as "pdf" | "docx" | "md" | "txt" | "";
               event.currentTarget.value = "";
               if (format) void exportThread(format);
             }}
@@ -232,6 +232,7 @@ export default function App() {
             <option value="">{EXPORT_UI_LABELS.exportChat}</option>
             <option value="pdf">{EXPORT_UI_LABELS.exportPdf}</option>
             <option value="docx">{EXPORT_UI_LABELS.exportDocx}</option>
+            <option value="txt">{EXPORT_UI_LABELS.exportTxt}</option>
             <option value="md">MD</option>
           </select>
 
@@ -335,7 +336,7 @@ export default function App() {
             <select
               defaultValue=""
               onChange={(event) => {
-                const format = event.target.value as "pdf" | "docx" | "md" | "";
+                const format = event.target.value as "pdf" | "docx" | "md" | "txt" | "";
                 event.currentTarget.value = "";
                 setMobileMenuOpen(false);
                 if (format) void exportThread(format);
@@ -347,6 +348,7 @@ export default function App() {
               <option value="">{EXPORT_UI_LABELS.exportChat}</option>
               <option value="pdf">{EXPORT_UI_LABELS.exportPdf}</option>
               <option value="docx">{EXPORT_UI_LABELS.exportDocx}</option>
+              <option value="txt">{EXPORT_UI_LABELS.exportTxt}</option>
               <option value="md">MD</option>
             </select>
 

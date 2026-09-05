@@ -210,7 +210,7 @@ by this app are not shared with another vector store or workflow.
 ## Chat Export
 
 When a conversation is active, use the `Export` menu in the header to choose
-`PDF`, `DOCX`, or `MD` and download the complete stored conversation. Exports include
+`PDF`, `DOCX`, `MD`, or plain `TXT` and download the complete stored conversation. Exports include
 the configured application title, chat title, export date/time, and full thread
 history, including messages older than the context window used by the assistant.
 Temporary conversations can be exported while they are active, but are lost
