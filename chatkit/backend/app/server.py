@@ -162,6 +162,8 @@ def configured_mcp_server(settings: dict[str, Any] | None = None) -> MCPServer |
     name = value("name", "Configured MCP server").strip()
     approval = _mcp_approval_policy()
 
+    # HTTP transports use an optional bearer token; stdio runs a local process and
+    # therefore receives command arguments instead of network connection headers.
     if transport in {"streamable-http", "http"}:
         url = value("url").strip()
         if not url:
@@ -275,6 +277,8 @@ class StarterAttachmentConverter(ThreadItemConverter):
         self,
         attachment: Attachment,
     ):
+        # Resolve before reading and require the upload directory as the parent so
+        # an attachment ID can never escape the configured storage directory.
         path = (UPLOAD_DIR / attachment.id).resolve()
 
         if path.parent != UPLOAD_DIR.resolve() or not path.is_file():

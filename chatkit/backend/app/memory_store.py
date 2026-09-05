@@ -212,6 +212,8 @@ class MemoryStore(Store[dict]):
 
     @contextmanager
     def _mutation_lock(self):
+        # The process lock protects threads in this worker; flock also coordinates
+        # separate worker processes that share the JSON store.
         with _PROCESS_LOCK:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.lock_path.open("a+", encoding="utf-8") as lock_file:
@@ -225,6 +227,8 @@ class MemoryStore(Store[dict]):
 
     @contextmanager
     def _read_lock(self):
+        # Reload while holding the shared lock so reads see the latest committed
+        # snapshot without racing an atomic replacement from another worker.
         with _PROCESS_LOCK:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.lock_path.open("a+", encoding="utf-8") as lock_file:
@@ -289,6 +293,8 @@ class MemoryStore(Store[dict]):
         }
         temporary_path: Path | None = None
         try:
+            # Write, flush, and replace in the same directory so readers never see
+            # a partially written JSON document after a crash or concurrent read.
             with NamedTemporaryFile(
                 mode="w",
                 encoding="utf-8",
@@ -340,6 +346,9 @@ class MemoryStore(Store[dict]):
         cursor_key,
         page_type,
     ):
+        # Cursors point to the last returned item, so the next page starts strictly
+        # after it in the requested ordering. An unknown cursor intentionally starts
+        # from the beginning, matching the forgiving behavior of the store API.
         sorted_rows = sorted(rows, key=sort_key, reverse=order == "desc")
         start = 0
         if after:

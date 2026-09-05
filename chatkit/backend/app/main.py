@@ -134,6 +134,8 @@ async def require_authentication(request: Request, call_next):
         return JSONResponse({"detail": "The system is temporarily unavailable for maintenance."}, status_code=503)
     auth_url = os.getenv("AUTH_INTERNAL_URL", "http://127.0.0.1:3001/api/auth/session")
     try:
+        # Forward the browser cookie to the internal auth service, while keeping
+        # the service-to-service secret out of the browser-facing request.
         async with httpx.AsyncClient(timeout=2.0) as client:
             auth_response = await client.get(auth_url, headers={
                 "cookie": request.headers.get("cookie", ""),
@@ -349,6 +351,8 @@ async def upload_attachment(
     bytes_written = 0
 
     try:
+        # Content-Length is only an early rejection. Streaming still enforces the
+        # limit because chunked requests can omit or falsify that header.
         with tempfile.NamedTemporaryFile(
             dir=UPLOAD_DIR,
             prefix=f".{attachment_id}.",

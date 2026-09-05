@@ -75,6 +75,8 @@ async def upload_and_replace(
         file=(filename, content, upload.content_type or "application/octet-stream"),
     )
 
+    # Upload and index the replacement first. If indexing fails, the old file is
+    # still available; once it succeeds, remove both old references and file data.
     for old_file in existing:
         await client.vector_stores.files.delete(
             file_id=old_file["id"],

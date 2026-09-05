@@ -65,6 +65,8 @@ export function KnowledgeBasePanel({ open, onClose }: KnowledgeBasePanelProps) {
         setMessage(`${UI_LABELS.indexingFile} (1/${pendingFiles.length})`);
         try {
             let replaced = false;
+            // Keep uploads sequential so progress is deterministic and same-name
+            // replacement requests cannot race one another in the vector store.
             for (const [index, file] of pendingFiles.entries()) {
                 setMessage(`${UI_LABELS.indexingFile} (${index + 1}/${pendingFiles.length})`);
                 const body = new FormData();

@@ -37,6 +37,8 @@ def export_text(locale: str) -> dict[str, str]:
 
 
 def _text(value: Any) -> str:
+    # ChatKit content can be nested across strings, segments, and annotations;
+    # recursively flatten only human-readable fields for all export formats.
     if isinstance(value, str):
         return value
     if isinstance(value, list):
@@ -66,6 +68,8 @@ CODE_BLOCK_PATTERN = re.compile(r"```[^\n]*\n?(.*?)```", re.DOTALL)
 
 
 def content_segments(text: str) -> list[tuple[str, bool]]:
+    # Preserve fenced code as a separate segment so DOCX and PDF can apply a
+    # monospace style without changing the Markdown export's original text.
     segments: list[tuple[str, bool]] = []
     cursor = 0
     for match in CODE_BLOCK_PATTERN.finditer(text):

@@ -73,6 +73,8 @@ export function MCPPanel({ open, storageKey, configUrl, onClose }: MCPPanelProps
     const toggleEnabled = async (enabled: boolean) => {
         if (!storageKey || toggleBusy) return;
         const nextSettings = { ...settings, enabled };
+        // Optimistically update the switch, then restore the previous state if the
+        // server rejects the change so the UI cannot drift from persisted config.
         setSettings(nextSettings);
         setToggleBusy(true);
         try {
@@ -96,6 +98,8 @@ export function MCPPanel({ open, storageKey, configUrl, onClose }: MCPPanelProps
         if (!storageKey || toggleBusy) return;
         setToggleBusy(true);
         try {
+            // Reset server state first, then mirror the server-provided defaults in
+            // local storage rather than assuming the client defaults are authoritative.
             const response = await fetch(configUrl, { method: "DELETE" });
             if (!response.ok) throw new Error("Unable to reset MCP settings");
             const defaults = await fetch(configUrl).then((result) => result.json() as Promise<Partial<McpSettings>>);

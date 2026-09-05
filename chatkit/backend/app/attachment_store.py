@@ -28,6 +28,8 @@ IMAGE_PLACEHOLDER_URL = (
 
 
 def public_base_url(context: dict[str, Any]) -> str | None:
+    # Preview links are sent to the model/client, so deployment URLs must be
+    # explicitly public HTTPS rather than an accidental local development host.
     configured_url = os.getenv("CHATKIT_PUBLIC_BASE_URL")
     if configured_url:
         parsed_url = urlparse(configured_url)
@@ -52,6 +54,8 @@ def public_base_url(context: dict[str, Any]) -> str | None:
 
 
 def upload_base_url(context: dict[str, Any]) -> str:
+    # Uploads may use a local origin during development; previews use the stricter
+    # public_base_url() policy above because they can outlive the current request.
     configured_url = public_base_url(context)
     if configured_url:
         return configured_url
