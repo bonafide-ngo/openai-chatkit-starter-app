@@ -54,7 +54,7 @@ class UserUsageStore:
             month_key = datetime.now(timezone.utc).strftime("%Y-%m")
             month = data.setdefault("months", {}).setdefault(
                 month_key,
-                {"month": month_key, "billing": 0.0, "accounts": {}},
+                {"billing": 0.0, "accounts": {}},
             )
             account = month["accounts"].setdefault(
                 email,

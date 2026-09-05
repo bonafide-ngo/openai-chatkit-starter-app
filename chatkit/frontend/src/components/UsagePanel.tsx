@@ -42,8 +42,11 @@ export function UsagePanel({ open, configUrl, onClose }: UsagePanelProps) {
 
     const limit = data?.billing_limit;
     const percentage = Math.min(Math.max(data?.billing_percentage ?? 0, 0), 100);
-    const maxTokens = Math.max(...(data?.tokens.map((item) => item.tokens) ?? [0]), 1);
-    const maxBilling = Math.max(...(data?.tokens.map((item) => item.billing) ?? [0]), 1);
+    const monthlyUsage = [...(data?.tokens ?? [])]
+        .sort((left, right) => left.month.localeCompare(right.month))
+        .slice(-12);
+    const maxTokens = Math.max(...monthlyUsage.map((item) => item.tokens), 1);
+    const maxBilling = Math.max(...monthlyUsage.map((item) => item.billing), 1);
     const monthFormatter = new Intl.DateTimeFormat(CHATKIT_LOCALE, { month: "short", year: "numeric" });
 
     return (
@@ -83,7 +86,7 @@ export function UsagePanel({ open, configUrl, onClose }: UsagePanelProps) {
                                 </div>
                             </div>
                             <div className="flex h-48 items-end gap-2 border-b border-slate-200 px-1 dark:border-slate-700">
-                                {data.tokens.map((item) => (
+                                {monthlyUsage.map((item) => (
                                     <div key={item.month} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2">
                                         <div className="flex h-[75%] w-full max-w-14 items-end justify-center gap-0.5">
                                             <div className="flex h-full w-1/2 flex-col items-center justify-end gap-0.5" title={`${formatTokens(item.tokens)} ${USAGE_LABELS.tokens}`} aria-label={`${formatTokens(item.tokens)} ${USAGE_LABELS.tokens}`}>
